@@ -234,7 +234,7 @@ function humanizeServerError(message = "") {
     return `Interne Anthropic-Modellkennung war ungültig. Standard ist jetzt ${defaultAnthropicModel}.`;
   }
   if (/the string did not match the expected pattern|string did not match|expected pattern/i.test(message)) {
-    return `Anthropic konnte den Request nicht annehmen. Geprüft: POST ${anthropicEndpoint}, Modell ${defaultAnthropicModel}.`;
+    return "Verbindungstest nicht erfolgreich. Diagnosewerte wurden erzeugt.";
   }
   return message || "Anthropic Anfrage fehlgeschlagen.";
 }

@@ -444,7 +444,7 @@ async function verifyAnthropicConnection({ markConnected = false } = {}) {
       const message = humanizeConnectionError(data.error || "Verbindung fehlgeschlagen");
       showAiError(message);
       renderApiDiagnostics(data.diagnostics);
-      logStatus(`Anthropic-Verbindung fehlgeschlagen: ${message || response.status}`);
+      logStatus(data.diagnostics ? `Verbindungstest nicht erfolgreich. HTTP-Status: ${data.diagnostics.responseStatus || data.diagnostics.modelsStatus || response.status}` : `Verbindungstest nicht erfolgreich. HTTP-Status: ${response.status}`);
     }
   } catch (error) {
     showAiError(humanizeConnectionError(error.message));
@@ -453,7 +453,7 @@ async function verifyAnthropicConnection({ markConnected = false } = {}) {
       method: "POST",
       error: humanizeConnectionError(error.message),
     });
-    logStatus(`Anthropic-Verbindung fehlgeschlagen: ${humanizeConnectionError(error.message)}`);
+    logStatus("Verbindungstest nicht erfolgreich. Diagnose prüfen.");
   } finally {
     apiKeyUi.loading = false;
     renderApiKeyManager();
@@ -547,7 +547,7 @@ function humanizeConnectionError(message = "") {
     return "Anthropic-Modellkennung war ungültig. Die App nutzt jetzt claude-3-5-sonnet-20241022 als Standard.";
   }
   if (/the string did not match the expected pattern|string did not match|expected pattern/i.test(message)) {
-    return "Anthropic konnte den Request nicht annehmen. Geprüft: POST /v1/messages ohne Slash, Modell claude-3-5-sonnet-20241022.";
+    return "Verbindungstest nicht erfolgreich. Bitte die Diagnosefelder darunter prüfen.";
   }
   return message || "Verbindung fehlgeschlagen";
 }
