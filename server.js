@@ -132,6 +132,29 @@ function collectMatches(value = "", pattern, limit = 30) {
     .slice(0, limit);
 }
 
+function stripScripts(value = "") {
+  return String(value).replace(/<script[\s\S]*?<\/script>/gi, " ");
+}
+
+function summarizeTemplateBlocks(raw = "") {
+  const cleaned = stripScripts(raw);
+  const blocks = [...cleaned.matchAll(/<(header|section|main|footer|nav|article)\b([^>]*)>([\s\S]*?)<\/\1>/gi)]
+    .map((match, index) => {
+      const tag = match[1].toLowerCase();
+      const attrs = compactText(match[2], 500);
+      const inner = match[3] || "";
+      const heading = compactText(inner.match(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i)?.[1] || "", 500);
+      const ctas = collectMatches(inner, /<(?:a|button)[^>]*>([\s\S]*?)<\/(?:a|button)>/gi, 8).join(" | ");
+      const text = compactText(inner, 1_500);
+      return `${index + 1}. <${tag} ${attrs}>
+Heading: ${heading || "-"}
+CTA: ${ctas || "-"}
+Inhalt/Pattern: ${text}`;
+    })
+    .slice(0, 18);
+  return blocks.join("\n\n");
+}
+
 function compactTemplateSource(value = "", limit = 120_000) {
   const raw = String(value || "");
   const title = compactText(raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "", 300);
@@ -139,6 +162,7 @@ function compactTemplateSource(value = "", limit = 120_000) {
   const headings = collectMatches(raw, /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, 24);
   const navItems = collectMatches(raw, /<(?:nav|header)[^>]*>([\s\S]*?)<\/(?:nav|header)>/gi, 4);
   const buttons = collectMatches(raw, /<(?:a|button)[^>]*>([\s\S]*?)<\/(?:a|button)>/gi, 24);
+  const templateBlocks = summarizeTemplateBlocks(raw);
   const sectionHints = [...raw.matchAll(/<(section|header|footer|main|article|div)\b([^>]*)>/gi)]
     .map((match) => compactText(`${match[1]} ${match[2]}`, 400))
     .filter((item) => /class=|id=|hero|cta|feature|benefit|workflow|faq|card|grid|section|nav|button/i.test(item))
@@ -156,6 +180,9 @@ ${headings.map((item, index) => `${index + 1}. ${item}`).join("\n")}
 
 Navigation/Header/CTA Muster:
 ${navItems.join("\n---\n")}
+
+Template-Skeleton in Reihenfolge:
+${templateBlocks}
 
 Button- und CTA-Texte:
 ${buttons.join(" | ")}
@@ -469,6 +496,7 @@ async function generateAiLandingPage(req, res) {
 
 Dein Ziel ist nicht "eine brauchbare Landingpage", sondern ein 10/10 Premium-Ergebnis, das wie eine professionell konzipierte Produktlandingpage wirkt.
 Der Kernauftrag: Die neue Landingpage muss vom Aufbau, Rhythmus, visuellen Stil, CTA-System und Section-Logik der Vorlage erkennbar abgeleitet sein. Die Inhalte duerfen dagegen nur aus der Inhaltsquelle der neuen Anwendung stammen.
+Das Blueprint ist der Bauplan. Ein gutes Blueprint ohne entsprechend gute HTML-Landingpage ist ein Fehler.
 
 Qualitaetsstandard 10/10:
 - Die Seite hat eine klare strategische Positionierung, keine generische SaaS-Sprache.
@@ -487,7 +515,8 @@ Arbeitsweise:
 4. Trenne strikt: "aus Quelle erkannt" vs. "Annahme". Erfinde keine Fakten.
 5. Verdichte daraus ein scharfes Landingpage-Konzept.
 6. Schreibe die Seite neu, nicht nur umsortiert.
-7. Fuehre vor der Ausgabe intern eine Selbstpruefung durch: Wenn das Ergebnis generisch klingt, verbessere es.
+7. Uebersetze das Blueprint 1:1 in landingPageHtml: Jede erkannte Template-Section braucht eine entsprechende neue Section mit Inhaltsquelle-Content.
+8. Fuehre vor der Ausgabe intern eine Selbstpruefung durch: Wenn das HTML generisch aussieht, zu wenig nach Vorlage wirkt oder Inhalte aus der Vorlage uebernimmt, verbessere es.
 
 Gib das Ergebnis ausschliesslich ueber das Tool deliver_landing_page zurueck. Schreibe keine separate Textantwort.`,
         messages: [
@@ -503,6 +532,9 @@ Nicht verhandelbare Anforderungen:
 - contentText ist die Inhaltsquelle der neuen Anwendung. Nutze sie fuer ALLE Inhalte: App-Name, Zielgruppe, Nutzen, Features, Workflow, Proof, CTA und Fachbegriffe.
 - Vermische die Inhalte der Vorlage nicht mit der neuen Anwendung.
 - Die neue Landingpage soll nicht identisch kopieren, aber sichtbar nach demselben Muster gebaut sein.
+- Das fertige landingPageHtml muss mindestens so viel Sorgfalt zeigen wie das Blueprint: kein generischer Standardaufbau, keine austauschbaren Sections, keine Dummy-Claims.
+- Nutze die Template-Skeleton-Reihenfolge aus templateText als primaeren Bauplan. Nur wenn eine Vorlage-Section inhaltlich nicht passt, ersetze sie durch eine funktional vergleichbare Section.
+- Jede HTML-Section soll als Kommentar markieren, welche Vorlage-Section sie abbildet, z. B. <!-- Vorlage: Hero -> Neue App Hero -->.
 - Nutze manuelle Inhalte nur als Ergaenzung oder Ersatz, falls eine Quelle wenig hergibt.
 - Markiere fehlende Informationen und Annahmen explizit im briefMarkdown.
 - landingPageHtml muss eine vollstaendige, eigenstaendige HTML-Datei mit inline CSS sein.
@@ -516,19 +548,22 @@ Nicht verhandelbare Anforderungen:
 - briefMarkdown muss so gut sein, dass Codex die Landingpage danach professionell weiterbearbeiten kann.
 
 Landingpage-Struktur:
-1. Header: hell, minimal, Markenname links, 2-3 Navigationlinks, starker CTA rechts.
-2. Hero: grosser Screenshot-Hintergrund oder hochwertiger dunkler Fallback, dunkles Overlay, praezise Headline, Subline, Primary/Secondary CTA, 2-3 Trust-/Outcome-Pills.
-3. Problem/Context: Warum die Zielgruppe diese App braucht, konkret statt allgemein.
-4. Nutzenkarten: 3-4 hochwertige Nutzen, jede mit klarer Konsequenz fuer Nutzer.
-5. Workflow/Produktlogik: Wie die App arbeitet, in 3-5 Schritten.
-6. Feature-Section: Features nur als Beweis fuer Nutzen, nicht als trockene Liste.
-7. Proof/Trust: Wenn keine echten Beweise vorhanden sind, formuliere glaubwuerdige Prozess- und Qualitaetsargumente ohne falsche Zahlen.
-8. FAQ oder Einwandbehandlung: 3-4 echte Entscheidungsfragen.
-9. Final CTA: ruhig, klar, handlungsorientiert.
+Nutze die Struktur der Vorlage als verbindliche Reihenfolge. Falls die Vorlage weniger oder mehr Abschnitte hat, folge der Vorlage. Die folgende Struktur ist nur ein Fallback:
+1. Header
+2. Hero
+3. Problem/Context
+4. Nutzenkarten
+5. Workflow/Produktlogik
+6. Feature-Section
+7. Proof/Trust
+8. FAQ oder Einwandbehandlung
+9. Final CTA
 
 Designregeln:
 - Beginne mit einer kurzen internen Template-Mapping-Entscheidung: Welche Vorlage-Section wird zu welcher neuen Section? Setze dieses Mapping im HTML um.
 - Wenn die Vorlage einen hellen Header, dunklen Screenshot-Hero, dezente Karten und ruhige Premium-Abstaende hat, muss die neue Landingpage dieselbe visuelle Grammatik tragen.
+- Uebernehme visuelle DNA aus der Vorlage: Header-Hoehe, Hero-Aufteilung, Breiten, Grid-Logik, Card-Radius, Button-Hoehe, Section-Abstaende, Farbfamilie, Schatten/Border, Footer-Rhythmus.
+- Verwende im HTML semantische CSS-Klassen, die die Vorlage nachzeichnen: hero, hero-overlay, section, card-grid, feature-card, workflow, proof, faq, final-cta.
 - Keine Farbexplosion. Nutze dunkles Ink, warmes Off-White, Teal/Green als Akzent, optional Gold nur sparsam.
 - Cards maximal 8px Radius.
 - Keine nested Cards.
@@ -546,6 +581,7 @@ Copy-Regeln:
 - Keine erfundenen Kunden, Zahlen, Zertifikate oder Testimonials.
 
 Briefing-Anforderungen:
+- Ganz oben im briefMarkdown: "Template-Mapping" als Tabelle mit Vorlage-Section -> neue Section -> verwendete Inhalte.
 - Quellenextraktion: Welche Designvorgaben wurden aus der Vorlage erkannt?
 - Quellenextraktion: Welche Inhaltsvorgaben wurden aus der Inhaltsquelle erkannt?
 - Positionierung
@@ -685,6 +721,12 @@ function normalizeGeneratedResult(result = {}, source = {}) {
   const offer = String(contentAnalysis.offer || `${projectName} professionell positioniert.`).trim();
   const headline = String(contentAnalysis.headline || templateAnalysis.headline || projectName).trim();
   const landingPageHtml = String(result.landingPageHtml || "").trim();
+  if (landingPageHtml && !/<!doctype html>|<html[\s>]/i.test(landingPageHtml)) {
+    throw new Error("KI-Ausgabe enthielt keine vollstaendige HTML-Datei.");
+  }
+  if (landingPageHtml && landingPageHtml.length < 8_000) {
+    throw new Error("KI-Ausgabe war zu kurz fuer eine professionelle Landingpage. Bitte Analyse erneut starten.");
+  }
 
   return {
     templateAnalysis: {
