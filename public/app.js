@@ -1,6 +1,7 @@
 const STORAGE_KEY = "landingpage-app-builder-v1";
 const SETTINGS_KEY = "landingpage-app-builder-settings-v1";
 const projectCount = 10;
+const localServerUrl = "http://127.0.0.1:8171/";
 const staleStatusPatterns = [
   /Verbindung zu Anthropic konnte nicht hergestellt werden/i,
   /Bitte Key erneut speichern und Verbindung testen/i,
@@ -47,6 +48,10 @@ let apiKeyUi = {
   loading: false,
   draft: "",
 };
+
+function isStaticGitHubPages() {
+  return location.hostname.endsWith("github.io");
+}
 
 const elements = {
   projectList: document.querySelector("#projectList"),
@@ -256,6 +261,8 @@ function renderApiKeyManager() {
   elements.connectAiButton.classList.toggle("connected", apiKeyUi.connected);
   elements.connectAiButton.classList.toggle("loading", apiKeyUi.loading);
   elements.testAiButton.classList.toggle("loading", apiKeyUi.loading);
+  elements.connectAiButton.disabled = isStaticGitHubPages();
+  elements.testAiButton.disabled = isStaticGitHubPages();
   renderApiDiagnostics();
 }
 
@@ -417,6 +424,17 @@ async function testAiConnection() {
 }
 
 async function verifyAnthropicConnection({ markConnected = false } = {}) {
+  if (isStaticGitHubPages()) {
+    const message = `GitHub Pages ist nur die statische Oberfläche. Anthropic funktioniert nur lokal mit laufendem Node-Server: ${localServerUrl}`;
+    showAiError(message);
+    renderApiDiagnostics({
+      endpoint: "/api/test-anthropic",
+      method: "POST",
+      error: "Kein Node-Server auf GitHub Pages",
+    });
+    logStatus("GitHub Pages hat keinen Node-Server. Lokal testen.");
+    return;
+  }
   const apiKey = getActiveApiKey();
   elements.aiConnectionStatus.className = "";
   if (!apiKey) return showAiError("Kein API-Key eingegeben");
@@ -543,6 +561,9 @@ function renderApiDiagnostics(diagnostics = null) {
 }
 
 function humanizeConnectionError(message = "") {
+  if (/failed to fetch|unexpected token|not found|404/i.test(message) && isStaticGitHubPages()) {
+    return `GitHub Pages hat keinen Node-Server. Bitte lokal öffnen: ${localServerUrl}`;
+  }
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
     return "Anthropic-Modellkennung war ungültig. Die App nutzt jetzt claude-3-5-sonnet-20241022 als Standard.";
   }
