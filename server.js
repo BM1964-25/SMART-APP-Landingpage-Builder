@@ -48,9 +48,14 @@ function compactText(value = "", limit = 80_000) {
 
 function normalizeApiKey(value = "") {
   return String(value)
+    .normalize("NFKC")
     .replace(/^Bearer\s*/i, "")
+    .replace(/^x-api-key\s*:\s*/i, "")
+    .replace(/[‐‑‒–—―−]/g, "-")
+    .replace(/[“”„‟‘’‚‛]/g, "")
     .replace(/^["'`]+|["'`]+$/g, "")
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u00a0\u1680\u180e\u2000-\u200f\u2028\u2029\u202f\u205f\u2060\u3000\ufeff\s]/g, "")
+    .replace(/[^\x21-\x7e•]/g, "")
     .trim();
 }
 

@@ -113,7 +113,11 @@ function loadSettings() {
       ...legacy,
       ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"),
     };
-    if (loaded.apiKey?.includes("•")) loaded.apiKey = "";
+    if (loaded.apiKey?.includes("•")) {
+      loaded.apiKey = "";
+    } else {
+      loaded.apiKey = normalizeApiKey(loaded.apiKey || "");
+    }
     return loaded;
   } catch {
     return { useAi: true, apiKey: "" };
@@ -406,11 +410,16 @@ function getActiveApiKey() {
 }
 
 function saveApiKey() {
-  const candidate = normalizeApiKey(apiKeyUi.draft || (apiKeyUi.visible ? elements.apiKeyInput.value : settings.apiKey));
-  if (!candidate) return showAiError("Kein API-Key eingegeben");
-  if (isMaskedApiKey(candidate)) {
+  const rawCandidate = apiKeyUi.draft || (apiKeyUi.visible ? elements.apiKeyInput.value : settings.apiKey);
+  if (isMaskedApiKey(rawCandidate)) {
     clearBrokenApiKey();
     return showAiError("Das ist nur die maskierte Anzeige, nicht der echte API-Key. Bitte den Original-Key einmal neu einfügen.");
+  }
+  const candidate = normalizeApiKey(rawCandidate);
+  if (!candidate) return showAiError("Kein API-Key eingegeben");
+  if (!isHeaderSafeApiKey(candidate)) {
+    clearBrokenApiKey();
+    return showAiError("Der eingefügte API-Key enthält weiterhin ungültige Zeichen. Bitte direkt aus der Anthropic Console kopieren.");
   }
   settings.apiKey = candidate;
   apiKeyUi.draft = "";
@@ -451,11 +460,20 @@ function humanizeConnectionError(message = "") {
   return message || "Verbindung fehlgeschlagen";
 }
 
+function isHeaderSafeApiKey(apiKey = "") {
+  return /^[\x21-\x7e]+$/.test(apiKey);
+}
+
 function normalizeApiKey(value = "") {
   return String(value)
+    .normalize("NFKC")
     .replace(/^Bearer\s*/i, "")
+    .replace(/^x-api-key\s*:\s*/i, "")
+    .replace(/[‐‑‒–—―−]/g, "-")
+    .replace(/[“”„‟‘’‚‛]/g, "")
     .replace(/^["'`]+|["'`]+$/g, "")
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u00a0\u1680\u180e\u2000-\u200f\u2028\u2029\u202f\u205f\u2060\u3000\ufeff\s]/g, "")
+    .replace(/[^\x21-\x7e•]/g, "")
     .trim();
 }
 
