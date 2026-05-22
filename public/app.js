@@ -4,7 +4,7 @@ const projectCount = 10;
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   id: crypto.randomUUID(),
-  name: `Landing Page ${index + 1}`,
+  name: index === 0 ? "SMART APP & Landingpage Builder" : `Landing Page ${index + 1}`,
   templateUrl: "",
   contentUrl: "",
   screenshotUrl: "",

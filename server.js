@@ -57,7 +57,7 @@ async function readUrl(req, res) {
     const response = await fetch(url, {
       redirect: "follow",
       headers: {
-        "user-agent": "SMART APP&Landingpage Builder/1.0",
+        "user-agent": "SMART APP & Landingpage Builder/1.0",
         accept: "text/html, text/plain, application/json;q=0.9, */*;q=0.8",
       },
     });
@@ -87,7 +87,7 @@ async function generateAiLandingPage(req, res) {
 
     const project = body.project || {};
     const source = {
-      name: project.name || "SMART APP&Landingpage Builder",
+      name: project.name || "SMART APP & Landingpage Builder",
       audience: project.audience || "",
       templateUrl: project.templateUrl || "",
       contentUrl: project.contentUrl || "",
@@ -227,5 +227,5 @@ createServer((req, res) => {
   }
   serveStatic(req, res);
 }).listen(port, () => {
-  console.log(`SMART APP&Landingpage Builder läuft auf http://127.0.0.1:${port}`);
+  console.log(`SMART APP & Landingpage Builder läuft auf http://127.0.0.1:${port}`);
 });
