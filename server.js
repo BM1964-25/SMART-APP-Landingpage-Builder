@@ -354,11 +354,14 @@ async function serveStatic(req, res) {
 
   try {
     const content = await readFile(filePath);
-    res.writeHead(200, { "content-type": mimeTypes[extname(filePath)] || "application/octet-stream" });
+    res.writeHead(200, {
+      "content-type": mimeTypes[extname(filePath)] || "application/octet-stream",
+      "cache-control": "no-store, max-age=0",
+    });
     res.end(content);
   } catch {
     const index = await readFile(join(root, "index.html"));
-    res.writeHead(200, { "content-type": mimeTypes[".html"] });
+    res.writeHead(200, { "content-type": mimeTypes[".html"], "cache-control": "no-store, max-age=0" });
     res.end(index);
   }
 }

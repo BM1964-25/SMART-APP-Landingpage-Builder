@@ -11,6 +11,9 @@ const staleStatusPatterns = [
   /Der API-Key enthält ein nicht erlaubtes Sonderzeichen/i,
   /Technischer Verbindungsfehler beim Senden an Anthropic/i,
   /Key wurde bereinigt/i,
+  /Der Key enthält ein ungültiges Zeichen oder Format/i,
+  /ohne Leerzeichen\/Zeilenumbrüche/i,
+  /Anthropic-Verbindung fehlgeschlagen/i,
 ];
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
