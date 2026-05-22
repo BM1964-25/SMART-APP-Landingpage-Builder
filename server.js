@@ -720,15 +720,7 @@ function normalizeGeneratedResult(result = {}, source = {}) {
   const projectName = source.name || "SMART APP & Landingpage Builder";
   const offer = String(contentAnalysis.offer || `${projectName} professionell positioniert.`).trim();
   const headline = String(contentAnalysis.headline || templateAnalysis.headline || projectName).trim();
-  const landingPageHtml = String(result.landingPageHtml || "").trim();
-  if (landingPageHtml && !/<!doctype html>|<html[\s>]/i.test(landingPageHtml)) {
-    throw new Error("KI-Ausgabe enthielt keine vollstaendige HTML-Datei.");
-  }
-  if (landingPageHtml && landingPageHtml.length < 8_000) {
-    throw new Error("KI-Ausgabe war zu kurz fuer eine professionelle Landingpage. Bitte Analyse erneut starten.");
-  }
-
-  return {
+  const normalized = {
     templateAnalysis: {
       headline: String(templateAnalysis.headline || headline).trim(),
       style: String(templateAnalysis.style || "BuiltSmart Premium Landingpage").trim(),
@@ -744,9 +736,100 @@ function normalizeGeneratedResult(result = {}, source = {}) {
       proof: asStringArray(contentAnalysis.proof, ["Aus Vorlage und Inhaltsquelle abgeleitet", "Annahmen im Briefing dokumentiert"]),
       rawSummary: asStringArray(contentAnalysis.rawSummary, [offer]),
     },
-    landingPageHtml: landingPageHtml || buildEmergencyLandingPage({ projectName, headline, offer }),
+  };
+
+  return {
+    ...normalized,
+    landingPageHtml: buildBlueprintLandingPage({ projectName, source, ...normalized }),
     briefMarkdown: String(result.briefMarkdown || buildEmergencyBrief({ projectName, headline, offer })).trim(),
   };
+}
+
+function takeItems(items = [], count = 4, fallback = []) {
+  const list = asStringArray(items, fallback);
+  return [...list, ...fallback].filter(Boolean).slice(0, count);
+}
+
+function titleFromText(value = "", fallback = "Nutzen") {
+  const words = String(value)
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.slice(0, 5).join(" ") || fallback;
+}
+
+function cssUrl(value = "") {
+  return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "");
+}
+
+function mapSectionPurpose(section = "", index = 0) {
+  const lower = String(section).toLowerCase();
+  if (/hero|start|intro/.test(lower)) return "Hero mit neuer App-Positionierung";
+  if (/feature|funktion/.test(lower)) return "Funktionen als Nutzenbeweis";
+  if (/benefit|nutzen|vorteil/.test(lower)) return "Nutzenkarten aus Inhaltsquelle";
+  if (/workflow|prozess|how|ablauf/.test(lower)) return "Produktlogik und Ablauf";
+  if (/proof|trust|kunden|beweis/.test(lower)) return "Vertrauen ohne erfundene Zahlen";
+  if (/faq|frage/.test(lower)) return "Einwandbehandlung";
+  if (/cta|kontakt|final/.test(lower)) return "Abschluss-CTA";
+  return index < 2 ? "Obere Seitenlogik der Vorlage" : "Passende neue Inhaltssektion";
+}
+
+function buildBlueprintLandingPage({ projectName, source = {}, templateAnalysis = {}, contentAnalysis = {} }) {
+  const ctas = takeItems(templateAnalysis.ctas, 2, ["Demo ansehen", "Gespräch starten"]);
+  const benefits = takeItems(contentAnalysis.benefits, 4, ["Klarere Entscheidungen", "Weniger manuelle Arbeit", "Professioneller Ablauf", "Besserer Überblick"]);
+  const features = takeItems(contentAnalysis.features, 6, ["Geführter Workflow", "Strukturierte Auswertung", "Exportfähige Ergebnisse", "Saubere Übersicht", "Praxisnahe Inhalte", "Schnelle Weiterbearbeitung"]);
+  const proof = takeItems(contentAnalysis.proof, 3, ["Aus realer App-Quelle abgeleitet", "Keine erfundenen Referenzen", "Qualitätslogik im Briefing dokumentiert"]);
+  const rawSummary = takeItems(contentAnalysis.rawSummary, 5, [contentAnalysis.offer]);
+  const sections = takeItems(templateAnalysis.sections, 8, ["Hero", "Problem", "Nutzen", "Workflow", "Features", "Proof", "FAQ", "Final CTA"]);
+  const screenshot = source.screenshotUrl ? `linear-gradient(90deg, rgba(10,16,19,.92), rgba(10,16,19,.76) 45%, rgba(10,16,19,.38)), url("${cssUrl(source.screenshotUrl)}")` : "linear-gradient(115deg, rgba(10,16,19,.96), rgba(13,74,69,.88) 52%, rgba(185,135,47,.46))";
+  const templateMap = sections
+    .map((section, index) => `<li><span>Vorlage ${index + 1}</span><strong>${escapeHtml(section)}</strong><em>${escapeHtml(mapSectionPurpose(section, index))}</em></li>`)
+    .join("");
+
+  return `<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(projectName)}</title>
+    <style>
+      :root { --ink:#10181c; --ink-2:#172327; --muted:#64747b; --line:#dde7ea; --paper:#fbfaf7; --panel:#fff; --soft:#eef5f4; --accent:#0e7c72; --accent-dark:#075c55; --gold:#b8872f; --shadow:0 22px 58px rgba(16,24,28,.12); }
+      *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper)} a{color:inherit}
+      .site-nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:22px;min-height:74px;padding:0 clamp(20px,5vw,76px);border-bottom:1px solid rgba(221,231,234,.9);background:rgba(255,255,255,.94);backdrop-filter:blur(16px)}
+      .brand{display:flex;align-items:center;gap:12px;font-weight:900}.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:8px;background:var(--ink);color:#fff;font-size:13px}.nav-links{display:flex;align-items:center;gap:24px;color:var(--muted);font-size:14px;font-weight:740}
+      .btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 22px;border:1px solid var(--accent);border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;font-weight:850;box-shadow:0 16px 36px rgba(14,124,114,.22)}.btn.secondary{border-color:rgba(255,255,255,.46);background:rgba(255,255,255,.12);box-shadow:none}
+      .hero{min-height:calc(100vh - 74px);display:grid;align-items:end;padding:clamp(86px,10vw,138px) clamp(20px,5vw,76px) clamp(54px,7vw,82px);color:#fff;background-image:${screenshot};background-size:cover;background-position:center}.hero-inner{width:min(940px,100%)}.eyebrow{margin:0 0 14px;color:#f1c478;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:0}
+      h1{max-width:980px;margin:0 0 22px;font-size:clamp(44px,7vw,88px);line-height:.96;letter-spacing:0}.lead{max-width:780px;margin:0;color:rgba(255,255,255,.82);font-size:clamp(18px,2vw,23px);line-height:1.58}.hero-actions{display:flex;flex-wrap:wrap;gap:13px;margin-top:34px}.trust-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:32px;color:rgba(255,255,255,.78)}.trust-row span{border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:9px 12px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px)}
+      section{padding:clamp(64px,8vw,108px) clamp(20px,5vw,76px)}.section-head{max-width:800px;margin-bottom:34px}h2{margin:0 0 14px;font-size:clamp(31px,4.2vw,56px);line-height:1.05;letter-spacing:0}h3{margin:0 0 10px;font-size:19px}p{color:var(--muted);line-height:1.68}.band{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+      .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}.card{min-height:210px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:24px;box-shadow:var(--shadow)}.card small{display:block;margin-bottom:18px;color:var(--gold);font-weight:900;text-transform:uppercase}
+      .workflow{display:grid;grid-template-columns:minmax(280px,.85fr) minmax(0,1.15fr);gap:clamp(28px,5vw,72px);align-items:start}.steps{display:grid;gap:13px;counter-reset:step}.step{counter-increment:step;display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;border:1px solid var(--line);border-radius:8px;padding:20px;background:var(--soft)}.step:before{content:counter(step);display:grid;place-items:center;width:44px;height:44px;border-radius:8px;background:var(--ink);color:#fff;font-weight:900}
+      .feature-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.feature{border-left:3px solid var(--accent);background:#fff;padding:18px 18px 18px 20px}.proof{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.proof-item{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:24px}.faq{display:grid;gap:12px}details{border:1px solid var(--line);border-radius:8px;background:#fff;padding:18px 20px}summary{cursor:pointer;font-weight:850}
+      .mapping{background:var(--ink);color:#fff}.mapping p{color:#c8d3d6}.mapping ol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;list-style:none}.mapping li{border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:16px;background:rgba(255,255,255,.06)}.mapping span,.mapping em{display:block;color:#aebcc1;font-style:normal;font-size:13px}
+      .final-cta{text-align:center;background:var(--ink);color:#fff}.final-cta p{max-width:720px;margin:0 auto 26px;color:#c8d3d6}
+      @media(max-width:980px){.grid,.feature-list,.proof,.mapping ol{grid-template-columns:repeat(2,minmax(0,1fr))}.workflow{grid-template-columns:1fr}}@media(max-width:680px){.nav-links a:not(.btn){display:none}.grid,.feature-list,.proof,.mapping ol{grid-template-columns:1fr}h1{font-size:42px}.hero{min-height:720px}.btn{width:100%}}
+    </style>
+  </head>
+  <body>
+    <!-- Vorlage: Header -> Neuer App-Header -->
+    <nav class="site-nav"><div class="brand"><span class="brand-mark">BS</span>${escapeHtml(projectName)}</div><div class="nav-links"><a href="#nutzen">Nutzen</a><a href="#workflow">Workflow</a><a class="btn" href="#kontakt">${escapeHtml(ctas[0])}</a></div></nav>
+    <!-- Vorlage: Hero -> Neue App Hero -->
+    <header class="hero"><div class="hero-inner"><p class="eyebrow">${escapeHtml(templateAnalysis.style || "BuiltSmart Premium")}</p><h1>${escapeHtml(contentAnalysis.headline)}</h1><p class="lead">${escapeHtml(contentAnalysis.offer)}</p><div class="hero-actions"><a class="btn" href="#kontakt">${escapeHtml(ctas[0])}</a><a class="btn secondary" href="#workflow">${escapeHtml(ctas[1])}</a></div><div class="trust-row">${proof.map((item) => `<span>${escapeHtml(titleFromText(item, "Qualitaet"))}</span>`).join("")}</div></div></header>
+    <!-- Vorlage: Template-Mapping -> Umsetzungskontrolle -->
+    <section class="mapping"><div class="section-head"><p class="eyebrow">Template-Mapping</p><h2>Der Aufbau folgt dem Blueprint der Vorlage.</h2><p>Die Struktur wurde aus den erkannten Vorlage-Sections abgeleitet und mit Inhalten der neuen Anwendung befüllt.</p></div><ol>${templateMap}</ol></section>
+    <!-- Vorlage: Nutzenkarten -> App-Nutzen -->
+    <section id="nutzen"><div class="section-head"><p class="eyebrow">Nutzen</p><h2>Was für Nutzer konkret besser wird</h2><p>${escapeHtml(rawSummary[0] || contentAnalysis.offer)}</p></div><div class="grid">${benefits.map((item, index) => `<article class="card"><small>0${index + 1}</small><h3>${escapeHtml(titleFromText(item, "Nutzen"))}</h3><p>${escapeHtml(item)}</p></article>`).join("")}</div></section>
+    <!-- Vorlage: Workflow/Product Logic -> Neuer App-Workflow -->
+    <section id="workflow" class="band"><div class="workflow"><div class="section-head"><p class="eyebrow">Workflow</p><h2>Vom Bedarf zur verwertbaren Entscheidung</h2><p>Die Landingpage erklärt nicht nur Features, sondern macht die Produktlogik der Anwendung nachvollziehbar.</p></div><div class="steps">${features.slice(0, 4).map((item) => `<div class="step"><div><h3>${escapeHtml(titleFromText(item, "Schritt"))}</h3><p>${escapeHtml(item)}</p></div></div>`).join("")}</div></div></section>
+    <!-- Vorlage: Feature Grid -> Funktionen als Nutzenbeweis -->
+    <section><div class="section-head"><p class="eyebrow">Funktionen</p><h2>Features, die den Nutzen sichtbar machen</h2><p>Jede Funktion wird als Beleg für das Nutzenversprechen eingesetzt, nicht als trockene Liste.</p></div><div class="feature-list">${features.map((item) => `<article class="feature"><h3>${escapeHtml(titleFromText(item, "Feature"))}</h3><p>${escapeHtml(item)}</p></article>`).join("")}</div></section>
+    <!-- Vorlage: Proof/Trust -> Vertrauenslogik -->
+    <section class="band"><div class="section-head"><p class="eyebrow">Vertrauen</p><h2>Glaubwürdig ohne erfundene Zahlen</h2><p>Die Aussagen bleiben nah an der Inhaltsquelle und dokumentieren Annahmen transparent im Briefing.</p></div><div class="proof">${proof.map((item) => `<article class="proof-item"><h3>${escapeHtml(titleFromText(item, "Proof"))}</h3><p>${escapeHtml(item)}</p></article>`).join("")}</div></section>
+    <!-- Vorlage: FAQ/Einwände -> Entscheidungsfragen -->
+    <section><div class="section-head"><p class="eyebrow">FAQ</p><h2>Fragen, die vor der Entscheidung wichtig sind</h2></div><div class="faq"><details open><summary>Für wen ist ${escapeHtml(projectName)} gedacht?</summary><p>${escapeHtml(rawSummary[1] || contentAnalysis.offer)}</p></details><details><summary>Was unterscheidet die Anwendung von einer reinen Informationsseite?</summary><p>${escapeHtml(benefits[0])}</p></details><details><summary>Welche Ergebnisse kann ich erwarten?</summary><p>${escapeHtml(benefits[1] || benefits[0])}</p></details><details><summary>Wie kann die Seite final veredelt werden?</summary><p>Mit echtem Screenshot, konkretem CTA und geprüften Proof-Elementen lässt sich diese Seite in Codex weiter professionalisieren.</p></details></div></section>
+    <!-- Vorlage: Final CTA -> Abschluss -->
+    <section id="kontakt" class="final-cta"><p class="eyebrow">Nächster Schritt</p><h2>${escapeHtml(projectName)} klar positionieren.</h2><p>${escapeHtml(contentAnalysis.offer)}</p><a class="btn" href="#">${escapeHtml(ctas[0])}</a></section>
+  </body>
+</html>`;
 }
 
 function buildEmergencyLandingPage({ projectName, headline, offer }) {
