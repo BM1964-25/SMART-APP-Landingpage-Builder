@@ -396,6 +396,9 @@ function showAiError(message) {
 }
 
 function humanizeConnectionError(message = "") {
+  if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
+    return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
+  }
   if (/expected pattern|string did not match/i.test(message)) {
     return "API-Key-Format nicht lesbar. Bitte Key neu einfügen, beginnend mit sk-ant-.";
   }

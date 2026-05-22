@@ -73,10 +73,20 @@ function validateAnthropicKey(apiKey) {
 }
 
 function humanizeServerError(message = "") {
+  if (/model/i.test(message) && /pattern|not found|invalid/i.test(message)) {
+    return "Interne Anthropic-Modellkennung war ungültig. Die App wurde auf eine gültige Sonnet-ID umgestellt.";
+  }
   if (/expected pattern|string did not match|header value/i.test(message)) {
     return "API-Key-Format nicht lesbar. Bitte Key neu einfügen, beginnend mit sk-ant-.";
   }
   return message || "Anthropic Anfrage fehlgeschlagen.";
+}
+
+function humanizeAnthropicApiError(message = "") {
+  if (/model/i.test(message) && /pattern|not found|invalid/i.test(message)) {
+    return "Anthropic-Modellkennung war ungültig. Bitte Server neu laden; Standard ist jetzt claude-sonnet-4-5-20250929.";
+  }
+  return humanizeServerError(message);
 }
 
 async function readUrl(req, res) {
@@ -112,7 +122,7 @@ async function generateAiLandingPage(req, res) {
   try {
     const body = await readJsonBody(req);
     const apiKey = normalizeApiKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
-    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
@@ -264,7 +274,7 @@ JSON-Format exakt:
 
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { error: data.error?.message || "Anthropic Anfrage fehlgeschlagen." });
+      sendJson(res, response.status, { error: humanizeAnthropicApiError(data.error?.message || "Anthropic Anfrage fehlgeschlagen.") });
       return;
     }
 
@@ -284,7 +294,7 @@ async function testAnthropicConnection(req, res) {
   try {
     const body = await readJsonBody(req, 30_000);
     const apiKey = normalizeApiKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
-    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
@@ -306,7 +316,7 @@ async function testAnthropicConnection(req, res) {
     });
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { ok: false, error: data.error?.message || "Anthropic Verbindung fehlgeschlagen." });
+      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(data.error?.message || "Anthropic Verbindung fehlgeschlagen.") });
       return;
     }
 
