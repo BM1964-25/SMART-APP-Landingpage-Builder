@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("./public", import.meta.url));
 const port = Number(process.env.PORT || 8171);
 const anthropicEndpoint = "https://api.anthropic.com/v1/messages";
+const anthropicModelsEndpoint = "https://api.anthropic.com/v1/models";
 const defaultAnthropicModel = "claude-3-5-sonnet-20241022";
 const allowedAnthropicModels = new Set([
   "claude-3-5-sonnet-20241022",
@@ -86,13 +87,46 @@ function validateAnthropicKey(apiKey) {
   return "";
 }
 
-function getAnthropicModel() {
+function getConfiguredAnthropicModel() {
   const candidate = String(process.env.ANTHROPIC_MODEL || "").trim();
   if (allowedAnthropicModels.has(candidate)) return candidate;
   return defaultAnthropicModel;
 }
 
-function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getAnthropicModel(), response = null, error = null } = {}) {
+async function resolveAnthropicModel(apiKey) {
+  try {
+    const response = await fetch(anthropicModelsEndpoint, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+    });
+    const data = await response.json();
+    const models = Array.isArray(data.data) ? data.data.map((item) => item.id).filter(Boolean) : [];
+    const configured = getConfiguredAnthropicModel();
+    const model = models.includes(configured) ? configured : models[0] || configured;
+    return {
+      ok: response.ok,
+      status: response.status,
+      model,
+      modelSource: models.includes(configured) ? "configured" : models[0] ? "models_api_first" : "fallback",
+      availableModels: models.slice(0, 8),
+      error: data.error?.message || "",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      model: getConfiguredAnthropicModel(),
+      modelSource: "fallback_after_models_error",
+      availableModels: [],
+      error: error.message || "Models API konnte nicht gelesen werden.",
+    };
+  }
+}
+
+function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getConfiguredAnthropicModel(), modelLookup = null, response = null, error = null } = {}) {
   const bodyPreview = JSON.stringify({
     model,
     max_tokens: 64,
@@ -106,7 +140,12 @@ function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getAnthropicMod
     bodyType: "string",
     bodyIsJson: true,
     model,
-    modelSource: process.env.ANTHROPIC_MODEL ? "env" : "default",
+    modelSource: modelLookup?.modelSource || (process.env.ANTHROPIC_MODEL ? "env" : "default"),
+    modelsEndpoint: anthropicModelsEndpoint,
+    modelsStatus: modelLookup?.status || null,
+    modelsOk: modelLookup?.ok ?? null,
+    availableModels: modelLookup?.availableModels || [],
+    modelsError: modelLookup?.error || "",
     keySource: rawKey ? "browser/localStorage" : "env",
     keyPresent: Boolean(apiKey),
     keyPrefix: apiKey ? apiKey.slice(0, 13) : "",
@@ -132,6 +171,9 @@ function logApiDiagnostics(diagnostics) {
   console.log("Body-Typ:", diagnostics.bodyType);
   console.log("Body JSON valide:", diagnostics.bodyIsJson);
   console.log("Modell:", diagnostics.model);
+  console.log("Modell-Quelle:", diagnostics.modelSource);
+  console.log("Models API Status:", diagnostics.modelsStatus);
+  console.log("Verfuegbare Modelle:", diagnostics.availableModels.join(", ") || "-");
   console.log("Key-Quelle:", diagnostics.keySource);
   console.log("Key vorhanden:", diagnostics.keyPresent);
   console.log("Key-Prefix:", diagnostics.keyPrefix);
@@ -196,13 +238,18 @@ async function generateAiLandingPage(req, res) {
     const body = await readJsonBody(req);
     const rawKey = decodeApiKey(body) || process.env.ANTHROPIC_API_KEY || "";
     const apiKey = normalizeApiKey(rawKey);
-    const model = getAnthropicModel();
-    const diagnostics = buildApiDiagnostics({ rawKey, apiKey, model });
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
       return;
     }
+    const modelLookup = await resolveAnthropicModel(apiKey);
+    if (!modelLookup.ok && modelLookup.status === 401) {
+      sendJson(res, 401, { error: modelLookup.error || "invalid x-api-key", diagnostics: buildApiDiagnostics({ rawKey, apiKey, model: modelLookup.model, modelLookup }) });
+      return;
+    }
+    const model = modelLookup.model;
+    const diagnostics = buildApiDiagnostics({ rawKey, apiKey, model, modelLookup });
 
     const project = body.project || {};
     const source = {
@@ -350,7 +397,7 @@ JSON-Format exakt:
 
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { error: humanizeAnthropicApiError(data.error?.message || "Anthropic Anfrage fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
+      sendJson(res, response.status, { error: humanizeAnthropicApiError(data.error?.message || "Anthropic Anfrage fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
       return;
     }
 
@@ -360,7 +407,7 @@ JSON-Format exakt:
       return;
     }
 
-    sendJson(res, 200, { ...parseJsonResponse(outputText), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
+    sendJson(res, 200, { ...parseJsonResponse(outputText), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
   } catch (error) {
     sendJson(res, 500, { error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
@@ -371,13 +418,18 @@ async function testAnthropicConnection(req, res) {
     const body = await readJsonBody(req, 30_000);
     const rawKey = decodeApiKey(body) || process.env.ANTHROPIC_API_KEY || "";
     const apiKey = normalizeApiKey(rawKey);
-    const model = getAnthropicModel();
-    const diagnostics = buildApiDiagnostics({ rawKey, apiKey, model });
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
       return;
     }
+    const modelLookup = await resolveAnthropicModel(apiKey);
+    if (!modelLookup.ok && modelLookup.status === 401) {
+      sendJson(res, 401, { ok: false, error: modelLookup.error || "invalid x-api-key", diagnostics: buildApiDiagnostics({ rawKey, apiKey, model: modelLookup.model, modelLookup }) });
+      return;
+    }
+    const model = modelLookup.model;
+    const diagnostics = buildApiDiagnostics({ rawKey, apiKey, model, modelLookup });
 
     logApiDiagnostics(diagnostics);
     const response = await fetch(anthropicEndpoint, {
@@ -395,12 +447,12 @@ async function testAnthropicConnection(req, res) {
     });
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(data.error?.message || "Anthropic Verbindung fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
+      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(data.error?.message || "Anthropic Verbindung fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
       return;
     }
 
     const text = data.content?.find((item) => item.type === "text")?.text || "";
-    sendJson(res, 200, { ok: true, model, text: text.trim(), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
+    sendJson(res, 200, { ok: true, model, text: text.trim(), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
   } catch (error) {
     sendJson(res, 500, { ok: false, error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
