@@ -12,7 +12,19 @@ const port = Number(process.env.PORT || 8173);
 const anthropicEndpoint = "https://api.anthropic.com/v1/messages";
 const anthropicModelsEndpoint = "https://api.anthropic.com/v1/models";
 const defaultAnthropicModel = "claude-3-5-sonnet-20241022";
+const preferredAnthropicModels = [
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5-20250929",
+  "claude-sonnet-4-20250514",
+  "claude-3-7-sonnet-20250219",
+  "claude-3-5-sonnet-20241022",
+  "claude-3-5-sonnet-latest",
+];
 const allowedAnthropicModels = new Set([
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5-20250929",
+  "claude-opus-4-7",
+  "claude-opus-4-6",
   "claude-3-5-sonnet-20241022",
   "claude-3-5-sonnet-latest",
   "claude-3-7-sonnet-20250219",
@@ -27,6 +39,45 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
+};
+
+const landingPageTool = {
+  name: "deliver_landing_page",
+  description: "Gibt das fertige Landingpage-Ergebnis strukturiert zurück.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["templateAnalysis", "contentAnalysis", "landingPageHtml", "briefMarkdown"],
+    properties: {
+      templateAnalysis: {
+        type: "object",
+        additionalProperties: false,
+        required: ["headline", "style", "sectionCount", "sections", "ctas"],
+        properties: {
+          headline: { type: "string" },
+          style: { type: "string" },
+          sectionCount: { type: "number" },
+          sections: { type: "array", items: { type: "string" } },
+          ctas: { type: "array", items: { type: "string" } },
+        },
+      },
+      contentAnalysis: {
+        type: "object",
+        additionalProperties: false,
+        required: ["offer", "headline", "benefits", "features", "proof", "rawSummary"],
+        properties: {
+          offer: { type: "string" },
+          headline: { type: "string" },
+          benefits: { type: "array", items: { type: "string" } },
+          features: { type: "array", items: { type: "string" } },
+          proof: { type: "array", items: { type: "string" } },
+          rawSummary: { type: "array", items: { type: "string" } },
+        },
+      },
+      landingPageHtml: { type: "string" },
+      briefMarkdown: { type: "string" },
+    },
+  },
 };
 
 mkdirSync(logsDir, { recursive: true });
@@ -131,6 +182,16 @@ function getConfiguredAnthropicModel() {
   return defaultAnthropicModel;
 }
 
+function pickBestAnthropicModel(models = []) {
+  const configured = getConfiguredAnthropicModel();
+  if (models.includes(configured)) return { model: configured, source: "configured" };
+  const preferred = preferredAnthropicModels.find((model) => models.includes(model));
+  if (preferred) return { model: preferred, source: "preferred_sonnet" };
+  const sonnet = models.find((model) => /sonnet/i.test(model));
+  if (sonnet) return { model: sonnet, source: "models_api_sonnet" };
+  return { model: models[0] || configured, source: models[0] ? "models_api_first" : "fallback" };
+}
+
 async function resolveAnthropicModel(apiKey) {
   try {
     const response = await fetch(anthropicModelsEndpoint, {
@@ -142,15 +203,14 @@ async function resolveAnthropicModel(apiKey) {
     });
     const { data, text } = await readJsonResponse(response);
     const models = Array.isArray(data.data) ? data.data.map((item) => item.id).filter(Boolean) : [];
-    const configured = getConfiguredAnthropicModel();
-    const model = models.includes(configured) ? configured : models[0] || configured;
+    const picked = pickBestAnthropicModel(models);
     return {
       ok: response.ok,
       status: response.status,
       statusText: response.statusText,
       responseHeaders: pickResponseHeaders(response),
-      model,
-      modelSource: models.includes(configured) ? "configured" : models[0] ? "models_api_first" : "fallback",
+      model: picked.model,
+      modelSource: picked.source,
       availableModels: models.slice(0, 8),
       error: data.error?.message || (!response.ok ? text.slice(0, 180) : ""),
     };
@@ -355,7 +415,7 @@ Arbeitsweise:
 6. Schreibe die Seite neu, nicht nur umsortiert.
 7. Fuehre vor der Ausgabe intern eine Selbstpruefung durch: Wenn das Ergebnis generisch klingt, verbessere es.
 
-Gib ausschliesslich valides JSON zurueck. Keine Markdown-Codefences, keine Erklaerung ausserhalb des JSON.`,
+Gib das Ergebnis ausschliesslich ueber das Tool deliver_landing_page zurueck. Schreibe keine separate Textantwort.`,
         messages: [
           {
             role: "user",
@@ -451,6 +511,8 @@ JSON-Format exakt:
 }`,
           },
         ],
+        tools: [landingPageTool],
+        tool_choice: { type: "tool", name: "deliver_landing_page" },
       }),
     });
 
@@ -461,13 +523,15 @@ JSON-Format exakt:
       return;
     }
 
+    const toolInput = data.content?.find((item) => item.type === "tool_use" && item.name === "deliver_landing_page")?.input;
     const outputText = data.content?.find((item) => item.type === "text")?.text;
-    if (!outputText) {
-      sendJson(res, 502, { error: "Anthropic Antwort enthielt keinen Text." });
+    if (!toolInput && !outputText) {
+      sendJson(res, 502, { error: "Anthropic Antwort enthielt kein nutzbares Ergebnis." });
       return;
     }
 
-    sendJson(res, 200, { ...parseJsonResponse(outputText), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response, responseText }) });
+    const parsed = toolInput || parseJsonResponse(outputText);
+    sendJson(res, 200, { ...normalizeGeneratedResult(parsed, source), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response, responseText }) });
   } catch (error) {
     sendJson(res, 500, { error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
@@ -529,6 +593,97 @@ function parseJsonResponse(text) {
     if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
     throw new Error("Anthropic Antwort war kein gueltiges JSON.");
   }
+}
+
+function asStringArray(value, fallback = []) {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return fallback;
+}
+
+function normalizeGeneratedResult(result = {}, source = {}) {
+  const templateAnalysis = result.templateAnalysis || {};
+  const contentAnalysis = result.contentAnalysis || {};
+  const projectName = source.name || "SMART APP & Landingpage Builder";
+  const offer = String(contentAnalysis.offer || `${projectName} professionell positioniert.`).trim();
+  const headline = String(contentAnalysis.headline || templateAnalysis.headline || projectName).trim();
+  const landingPageHtml = String(result.landingPageHtml || "").trim();
+
+  return {
+    templateAnalysis: {
+      headline: String(templateAnalysis.headline || headline).trim(),
+      style: String(templateAnalysis.style || "BuiltSmart Premium Landingpage").trim(),
+      sectionCount: Number(templateAnalysis.sectionCount || 9),
+      sections: asStringArray(templateAnalysis.sections, ["Hero", "Problem", "Nutzen", "Workflow", "Features", "Proof", "FAQ", "Final CTA"]),
+      ctas: asStringArray(templateAnalysis.ctas, ["Demo ansehen", "Projekt starten"]),
+    },
+    contentAnalysis: {
+      offer,
+      headline,
+      benefits: asStringArray(contentAnalysis.benefits, ["Klarere Positionierung", "Bessere Entscheidungsgrundlage", "Professioneller Landingpage-Aufbau"]),
+      features: asStringArray(contentAnalysis.features, ["Strukturierte Inhalte", "Gefuehrter Workflow", "Exportfaehige HTML-Ausgabe"]),
+      proof: asStringArray(contentAnalysis.proof, ["Aus Vorlage und Inhaltsquelle abgeleitet", "Annahmen im Briefing dokumentiert"]),
+      rawSummary: asStringArray(contentAnalysis.rawSummary, [offer]),
+    },
+    landingPageHtml: landingPageHtml || buildEmergencyLandingPage({ projectName, headline, offer }),
+    briefMarkdown: String(result.briefMarkdown || buildEmergencyBrief({ projectName, headline, offer })).trim(),
+  };
+}
+
+function buildEmergencyLandingPage({ projectName, headline, offer }) {
+  return `<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(projectName)}</title>
+    <style>
+      body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#142025;background:#f7faf9}
+      header{padding:80px 7vw;background:#10181c;color:#fff}
+      main{padding:56px 7vw;display:grid;gap:24px}
+      h1{font-size:clamp(40px,6vw,72px);line-height:1;margin:0 0 18px}
+      p{font-size:18px;line-height:1.7;color:#5f7078}
+      header p{color:#d7e0e3;max-width:760px}
+      section{background:#fff;border:1px solid #dfe8eb;border-radius:8px;padding:28px}
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>${escapeHtml(projectName)}</strong>
+      <h1>${escapeHtml(headline)}</h1>
+      <p>${escapeHtml(offer)}</p>
+    </header>
+    <main>
+      <section>
+        <h2>Landingpage-Entwurf</h2>
+        <p>Die KI-Antwort war strukturell unvollständig. Diese sichere Ersatzseite verhindert Datenverlust; Details stehen im Briefing und können erneut verfeinert werden.</p>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
+function buildEmergencyBrief({ projectName, headline, offer }) {
+  return `# ${projectName}
+
+## Hinweis
+Die KI-Antwort war nicht vollständig strukturiert. Die App hat deshalb ein sicheres Basis-Ergebnis erzeugt, statt die Analyse abzubrechen.
+
+## Erkannte Richtung
+- Headline: ${headline}
+- Angebot: ${offer}
+
+## Nächster Schritt
+Analyse erneut starten oder dieses Briefing mit Codex weiter verfeinern.`;
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 async function serveStatic(req, res) {
