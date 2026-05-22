@@ -32,6 +32,8 @@ const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   status: [],
 }));
 
+purgeStaleBrowserStorage();
+
 let shouldSaveMigratedState = false;
 let state = loadState();
 let settings = loadSettings();
@@ -142,6 +144,37 @@ function saveState() {
 }
 
 if (shouldSaveMigratedState) saveState();
+
+function purgeStaleBrowserStorage() {
+  const storageKeys = [STORAGE_KEY, SETTINGS_KEY];
+  [localStorage, sessionStorage].forEach((storage) => {
+    storageKeys.forEach((key) => {
+      const raw = storage.getItem(key);
+      if (!raw || !hasStaleStatusText(raw)) return;
+      if (key === STORAGE_KEY) {
+        try {
+          const projects = JSON.parse(raw);
+          if (Array.isArray(projects)) {
+            const cleanedProjects = projects.map((project) => ({
+              ...project,
+              status: Array.isArray(project.status) ? project.status.filter((message) => !hasStaleStatusText(message)) : [],
+            }));
+            storage.setItem(key, JSON.stringify(cleanedProjects));
+            return;
+          }
+        } catch {
+          storage.removeItem(key);
+          return;
+        }
+      }
+      storage.removeItem(key);
+    });
+  });
+}
+
+function hasStaleStatusText(value = "") {
+  return staleStatusPatterns.some((pattern) => pattern.test(String(value)));
+}
 
 function activeProject() {
   return state[activeIndex];
