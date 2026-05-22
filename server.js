@@ -479,6 +479,12 @@ async function generateAiLandingPage(req, res) {
     const source = {
       name: project.name || "SMART APP & Landingpage Builder",
       audience: project.audience || "",
+      problem: project.problem || "",
+      mainBenefit: project.mainBenefit || "",
+      desiredCta: project.desiredCta || "",
+      tone: project.tone || "",
+      mustUse: project.mustUse || "",
+      avoid: project.avoid || "",
       templateUrl: project.templateUrl || "",
       contentUrl: project.contentUrl || "",
       screenshotUrl: project.screenshotUrl || "",
@@ -541,6 +547,10 @@ Nicht verhandelbare Anforderungen:
 - Nutze die Template-Skeleton-Reihenfolge aus templateText als primaeren Bauplan. Nur wenn eine Vorlage-Section inhaltlich nicht passt, ersetze sie durch eine funktional vergleichbare Section.
 - Jede HTML-Section soll als Kommentar markieren, welche Vorlage-Section sie abbildet, z. B. <!-- Vorlage: Hero -> Neue App Hero -->.
 - Nutze manuelle Inhalte nur als Ergaenzung oder Ersatz, falls eine Quelle wenig hergibt.
+- Nutze die Steuerfelder problem, mainBenefit, desiredCta, tone, mustUse und avoid als verbindliche Qualitaetsvorgaben.
+- Wenn desiredCta gesetzt ist, muss dieser CTA sichtbar in Header, Hero und Final CTA erscheinen.
+- Wenn mustUse gesetzt ist, muessen diese Inhalte sichtbar verarbeitet werden.
+- Wenn avoid gesetzt ist, duerfen diese Begriffe oder Claims nicht in landingPageHtml erscheinen.
 - Markiere fehlende Informationen und Annahmen explizit im briefMarkdown.
 - landingPageHtml muss eine vollstaendige, eigenstaendige HTML-Datei mit inline CSS sein.
 - Die Landingpage muss deutsch sein.
@@ -580,6 +590,7 @@ Designregeln:
 
 Copy-Regeln:
 - Headline muss spezifisch sein und darf nicht nur den App-Namen wiederholen.
+- Headline und Subline muessen Hauptproblem und Hauptnutzen aus den Steuerfeldern beruecksichtigen, falls gesetzt.
 - Subline erklaert Outcome plus Mechanismus.
 - Nutze konkrete Verben.
 - Jede Benefit-Karte beantwortet: "Was wird fuer den Nutzer besser?"
@@ -820,9 +831,11 @@ function extractSourceFactsFromCompactContent(value = "", projectName = "") {
 
 function buildBlueprintLandingPage({ projectName, source = {}, templateAnalysis = {}, contentAnalysis = {} }) {
   const sourceFacts = extractSourceFactsFromCompactContent(source.contentText, projectName);
-  const ctas = takeItems(templateAnalysis.ctas, 2, ["Demo ansehen", "Gespräch starten"]);
-  const headline = isTemplateMetaText(contentAnalysis.headline) ? sourceFacts.headline : contentAnalysis.headline;
-  const offer = isTemplateMetaText(contentAnalysis.offer) ? sourceFacts.offer : contentAnalysis.offer;
+  const ctas = takeItems([source.desiredCta, ...asStringArray(templateAnalysis.ctas)], 2, ["Demo ansehen", "Gespräch starten"]);
+  const headlineBase = isTemplateMetaText(contentAnalysis.headline) ? sourceFacts.headline : contentAnalysis.headline;
+  const offerBase = isTemplateMetaText(contentAnalysis.offer) ? sourceFacts.offer : contentAnalysis.offer;
+  const headline = source.mainBenefit ? `${projectName}: ${source.mainBenefit}` : headlineBase;
+  const offer = [source.problem ? `Für ${source.audience || "Teams"}, die ${source.problem}.` : "", offerBase].filter(Boolean).join(" ");
   const benefits = takeItems(cleanContentItems(contentAnalysis.benefits, sourceFacts.benefits), 4, sourceFacts.benefits.length ? sourceFacts.benefits : ["Klarere Entscheidungen", "Weniger manuelle Arbeit", "Professioneller Ablauf", "Besserer Überblick"]);
   const features = takeItems(cleanContentItems(contentAnalysis.features, sourceFacts.features), 6, sourceFacts.features.length ? sourceFacts.features : benefits);
   const proof = takeItems(cleanContentItems(contentAnalysis.proof, sourceFacts.proof), 3, sourceFacts.proof.length ? sourceFacts.proof : ["Aus realer App-Quelle abgeleitet", "Keine erfundenen Referenzen", "Qualitätslogik im Briefing dokumentiert"]);

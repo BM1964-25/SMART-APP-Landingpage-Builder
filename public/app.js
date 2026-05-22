@@ -31,10 +31,17 @@ const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   contentUrl: "",
   screenshotUrl: "",
   audience: "",
+  problem: "",
+  mainBenefit: "",
+  desiredCta: "",
+  tone: "",
+  mustUse: "",
+  avoid: "",
   manualContent: "",
   sourceContentText: "",
   templateAnalysis: null,
   contentAnalysis: null,
+  qualityReport: null,
   briefMarkdown: "",
   generatedHtml: "",
   status: [],
@@ -83,6 +90,12 @@ const elements = {
   contentUrlInput: document.querySelector("#contentUrlInput"),
   screenshotUrlInput: document.querySelector("#screenshotUrlInput"),
   audienceInput: document.querySelector("#audienceInput"),
+  problemInput: document.querySelector("#problemInput"),
+  mainBenefitInput: document.querySelector("#mainBenefitInput"),
+  desiredCtaInput: document.querySelector("#desiredCtaInput"),
+  toneInput: document.querySelector("#toneInput"),
+  mustUseInput: document.querySelector("#mustUseInput"),
+  avoidInput: document.querySelector("#avoidInput"),
   manualContentInput: document.querySelector("#manualContentInput"),
   statusLog: document.querySelector("#statusLog"),
   statusPanel: document.querySelector(".status-panel"),
@@ -94,6 +107,10 @@ const elements = {
   exportButton: document.querySelector("#exportButton"),
   templateBlueprint: document.querySelector("#templateBlueprint"),
   contentBlueprint: document.querySelector("#contentBlueprint"),
+  qualityScore: document.querySelector("#qualityScore"),
+  qualitySummary: document.querySelector("#qualitySummary"),
+  qualityChecks: document.querySelector("#qualityChecks"),
+  qualityOutput: document.querySelector("#qualityOutput"),
   sourceContentOutput: document.querySelector("#sourceContentOutput"),
   previewFrame: document.querySelector("#previewFrame"),
   htmlOutput: document.querySelector("#htmlOutput"),
@@ -103,6 +120,7 @@ const elements = {
   copySourceButton: document.querySelector("#copySourceButton"),
   clearSourceButton: document.querySelector("#clearSourceButton"),
   copyBriefButton: document.querySelector("#copyBriefButton"),
+  copyQualityButton: document.querySelector("#copyQualityButton"),
   downloadButton: document.querySelector("#downloadButton"),
   downloadBriefButton: document.querySelector("#downloadBriefButton"),
   exportProjectButton: document.querySelector("#exportProjectButton"),
@@ -136,6 +154,7 @@ function migrateProject(project, index) {
     }
   }
   migrated.sourceContentText = migrated.sourceContentText || "";
+  migrated.qualityReport = migrated.qualityReport || null;
   return migrated;
 }
 
@@ -207,7 +226,7 @@ function activeProject() {
 function setProjectValue(key, value) {
   const project = activeProject();
   project[key] = value;
-  const shouldClearDerivedData = ["templateUrl", "contentUrl", "screenshotUrl", "audience", "manualContent"].includes(key);
+  const shouldClearDerivedData = ["templateUrl", "contentUrl", "screenshotUrl", "audience", "problem", "mainBenefit", "desiredCta", "tone", "mustUse", "avoid", "manualContent"].includes(key);
   if (shouldClearDerivedData) {
     clearProjectResult(project);
   }
@@ -217,6 +236,7 @@ function setProjectValue(key, value) {
     renderStatus(project.status);
     renderBlueprints();
     renderSourceContent();
+    renderQuality();
     renderBriefing();
     updateOutput("");
   }
@@ -236,6 +256,7 @@ function clearProjectResult(project) {
   project.sourceContentText = "";
   project.templateAnalysis = null;
   project.contentAnalysis = null;
+  project.qualityReport = null;
   project.briefMarkdown = "";
   project.generatedHtml = "";
   project.status = [];
@@ -288,10 +309,17 @@ function render() {
   elements.contentUrlInput.value = project.contentUrl || "";
   elements.screenshotUrlInput.value = project.screenshotUrl || "";
   elements.audienceInput.value = project.audience || "";
+  elements.problemInput.value = project.problem || "";
+  elements.mainBenefitInput.value = project.mainBenefit || "";
+  elements.desiredCtaInput.value = project.desiredCta || "";
+  elements.toneInput.value = project.tone || "";
+  elements.mustUseInput.value = project.mustUse || "";
+  elements.avoidInput.value = project.avoid || "";
   elements.manualContentInput.value = project.manualContent || "";
   renderStatus(project.status);
   renderBlueprints();
   renderSourceContent();
+  renderQuality();
   renderBriefing();
   updateOutput(project.generatedHtml || buildLandingPage(project));
   renderProjectList();
@@ -372,6 +400,24 @@ function renderSourceContent() {
   elements.sourceContentOutput.value = sourceText || "Noch kein Quelleninhalt ausgelesen. Trage eine Inhaltsquelle ein und starte die Analyse.";
 }
 
+function renderQuality() {
+  const project = activeProject();
+  const report = project.qualityReport;
+  if (!report) {
+    elements.qualityScore.textContent = "Noch nicht geprüft";
+    elements.qualitySummary.textContent = "Nach der Analyse bewertet die App, ob die Landingpage spezifisch, quellenbasiert und professionell genug ist.";
+    elements.qualityChecks.innerHTML = `<div class="quality-check neutral"><strong>Wartet auf Analyse</strong><span>Starte die Erstellung, danach erscheinen Score, Checks und konkrete Nachbesserungen.</span></div>`;
+    elements.qualityOutput.value = "Noch keine Qualitätsprüfung vorhanden.";
+    return;
+  }
+  elements.qualityScore.textContent = `${report.score}/100`;
+  elements.qualitySummary.textContent = report.summary;
+  elements.qualityChecks.innerHTML = report.checks
+    .map((check) => `<div class="quality-check ${check.ok ? "ok" : "fail"}"><strong>${escapeHtml(check.label)}</strong><span>${escapeHtml(check.detail)}</span></div>`)
+    .join("");
+  elements.qualityOutput.value = buildQualityInstructions(project, report);
+}
+
 function updateOutput(html) {
   elements.htmlOutput.value = html;
   elements.previewFrame.srcdoc = html;
@@ -418,6 +464,7 @@ async function analyzeActiveProject() {
           project.contentAnalysis = aiResult.contentAnalysis;
           project.generatedHtml = aiResult.landingPageHtml;
           project.briefMarkdown = aiResult.briefMarkdown;
+          finalizeQuality(project);
           logStatus("KI-Landingpage und Briefing wurden erstellt.");
         } else {
           logStatus(`KI nicht erfolgreich: ${aiResult.error}`);
@@ -451,6 +498,7 @@ function applyFallbackGeneration(project, templateText, contentText) {
   project.contentAnalysis = analyzeContent(contentText, project);
   project.generatedHtml = buildLandingPage(project);
   project.briefMarkdown = buildFallbackBrief(project);
+  finalizeQuality(project);
 }
 
 async function generateWithAi(project, templateText, contentText, apiKey) {
@@ -908,6 +956,97 @@ function ensureItems(items, fallback) {
   return unique([...(items || []), ...fallback]).slice(0, 4);
 }
 
+function finalizeQuality(project) {
+  project.qualityReport = evaluateLandingPageQuality(project);
+  project.briefMarkdown = appendQualityToBrief(project.briefMarkdown || buildFallbackBrief(project), project, project.qualityReport);
+  logStatus(`Qualitätsprüfung abgeschlossen: ${project.qualityReport.score}/100.`);
+}
+
+function evaluateLandingPageQuality(project) {
+  const html = project.generatedHtml || "";
+  const plain = htmlToText(html).toLowerCase();
+  const source = `${project.sourceContentText || ""}\n${project.manualContent || ""}`.toLowerCase();
+  const checks = [];
+  const add = (label, ok, detail, weight) => checks.push({ label, ok, detail, weight });
+  const sections = (html.match(/<(section|header|footer)\b/gi) || []).length;
+  const hasName = plain.includes((project.name || "").toLowerCase().slice(0, 24));
+  const hasProblem = !project.problem || plain.includes(project.problem.toLowerCase().slice(0, 24));
+  const hasBenefit = !project.mainBenefit || plain.includes(project.mainBenefit.toLowerCase().slice(0, 24));
+  const hasCta = !project.desiredCta || plain.includes(project.desiredCta.toLowerCase());
+  const hasTemplateLeak = /template-mapping|der aufbau folgt dem blueprint|vorlage\s+\d|hero-copy|product-band|section-heading|card-grid|blueprint der vorlage/i.test(html);
+  const hasGenericCopy = /premium-landingpage|professioneller ablauf|besserer überblick|klare positionierung|weniger manuelle arbeit|schnelle weiterbearbeitung/i.test(plain);
+  const hasSourceOverlap = source
+    ? source
+        .split(/\n|\. /)
+        .map((item) => item.trim())
+        .filter((item) => item.length > 35)
+        .some((item) => plain.includes(item.slice(0, Math.min(42, item.length))))
+    : false;
+  const mustUseItems = splitControlList(project.mustUse);
+  const avoidItems = splitControlList(project.avoid);
+  const missingMustUse = mustUseItems.filter((item) => !plain.includes(item.toLowerCase()));
+  const foundAvoid = avoidItems.filter((item) => plain.includes(item.toLowerCase()));
+
+  add("Quelleninhalt sichtbar genutzt", hasSourceOverlap || Boolean(project.manualContent), hasSourceOverlap ? "Echte Inhaltsfragmente wurden in der Landingpage wiedergefunden." : "Zu wenig eindeutig erkennbare Inhalte aus der Inhaltsquelle.", 18);
+  add("Keine Vorlagen-Meta-Texte", !hasTemplateLeak, hasTemplateLeak ? "Interne Begriffe wie Blueprint/Vorlage/Section sind noch sichtbar." : "Keine sichtbaren Template-Mapping-Reste erkannt.", 18);
+  add("Spezifischer App-Bezug", hasName, hasName ? "Der App-/Projektname ist in der Seite sichtbar." : "Der App-/Projektname fehlt oder ist zu schwach eingebunden.", 12);
+  add("Ausreichende Seitenstruktur", sections >= 7, `${sections} sichtbare Header-/Section-Blöcke erkannt. Ziel: mindestens 7.`, 12);
+  add("Hauptproblem berücksichtigt", hasProblem, hasProblem ? "Das angegebene Problem wird aufgegriffen." : "Das angegebene Hauptproblem fehlt in der Seite.", 10);
+  add("Hauptnutzen berücksichtigt", hasBenefit, hasBenefit ? "Der gewünschte Nutzen ist erkennbar." : "Der Hauptnutzen sollte im Hero und in Nutzenkarten klarer erscheinen.", 10);
+  add("CTA berücksichtigt", hasCta, hasCta ? "Der gewünschte CTA ist enthalten." : "Der gewünschte CTA fehlt oder wurde verwässert.", 8);
+  add("Keine generische Füllsprache", !hasGenericCopy, hasGenericCopy ? "Es sind noch generische Fallback-Formulierungen sichtbar." : "Keine groben Fallback-Floskeln erkannt.", 8);
+  add("Pflichtbegriffe", missingMustUse.length === 0, missingMustUse.length ? `Fehlt: ${missingMustUse.join(", ")}` : "Alle Pflichtbegriffe wurden gefunden.", 8);
+  add("Ausschlussbegriffe", foundAvoid.length === 0, foundAvoid.length ? `Nicht verwenden, aber gefunden: ${foundAvoid.join(", ")}` : "Keine verbotenen Begriffe gefunden.", 8);
+
+  const totalWeight = checks.reduce((sum, check) => sum + check.weight, 0);
+  const reached = checks.reduce((sum, check) => sum + (check.ok ? check.weight : 0), 0);
+  const score = Math.round((reached / totalWeight) * 100);
+  const summary = score >= 90
+    ? "Sehr solide Grundlage. Jetzt geht es vor allem um visuelle Feinpolitur und echte Screenshots."
+    : score >= 75
+      ? "Brauchbare Grundlage, aber einzelne Inhalte muessen noch spezifischer und quellennaeher werden."
+      : "Noch nicht 10/10. Die Seite braucht mehr echte Inhaltsquelle, weniger generische Copy und klarere Positionierung.";
+  return { score, summary, checks };
+}
+
+function splitControlList(value = "") {
+  return String(value)
+    .split(/\n|,|;/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 2);
+}
+
+function buildQualityInstructions(project, report) {
+  const failed = report.checks.filter((check) => !check.ok);
+  return `# Qualitätsprüfung ${report.score}/100
+
+## Kurzbewertung
+${report.summary}
+
+## Muss nachgebessert werden
+${failed.length ? failed.map((check) => `- ${check.label}: ${check.detail}`).join("\n") : "- Keine kritischen Punkte erkannt."}
+
+## Produktionsanweisung für Codex
+- Verwende die Vorlage nur als Design- und Strukturmuster, nicht als Textquelle.
+- Schreibe Hero, Nutzenkarten, Workflow, Features und CTA aus der Inhaltsquelle neu.
+- Entferne alle internen Begriffe wie Blueprint, Template-Mapping, Vorlage 1, Hero-Copy, Grid oder Section-Heading aus der sichtbaren Landingpage.
+- Baue mindestens 7 hochwertige Sections mit konkreter Aufgabe: Hero, Problem, Loesung, Nutzen, Workflow, Features, Vertrauen, FAQ, Final CTA.
+- App-Name: ${project.name || "nicht gesetzt"}
+- Zielgruppe: ${project.audience || "nicht gesetzt"}
+- Hauptproblem: ${project.problem || "nicht gesetzt"}
+- Hauptnutzen: ${project.mainBenefit || "nicht gesetzt"}
+- Gewuenschter CTA: ${project.desiredCta || "nicht gesetzt"}
+- Tonalitaet: ${project.tone || "aus Vorlage ableiten"}
+- Muss verwendet werden: ${project.mustUse || "nicht gesetzt"}
+- Nicht verwenden: ${project.avoid || "nicht gesetzt"}`;
+}
+
+function appendQualityToBrief(brief, project, report) {
+  const marker = "\n\n## Automatische Qualitätsprüfung\n";
+  const cleanBrief = String(brief || "").split(marker)[0].trim();
+  return `${cleanBrief}${marker}${buildQualityInstructions(project, report)}`;
+}
+
 function buildFallbackBrief(project) {
   const template = project.templateAnalysis || {};
   const content = project.contentAnalysis || {};
@@ -1043,6 +1182,12 @@ elements.templateUrlInput.addEventListener("input", (event) => setProjectValue("
 elements.contentUrlInput.addEventListener("input", (event) => setProjectValue("contentUrl", event.target.value));
 elements.screenshotUrlInput.addEventListener("input", (event) => setProjectValue("screenshotUrl", event.target.value));
 elements.audienceInput.addEventListener("input", (event) => setProjectValue("audience", event.target.value));
+elements.problemInput.addEventListener("input", (event) => setProjectValue("problem", event.target.value));
+elements.mainBenefitInput.addEventListener("input", (event) => setProjectValue("mainBenefit", event.target.value));
+elements.desiredCtaInput.addEventListener("input", (event) => setProjectValue("desiredCta", event.target.value));
+elements.toneInput.addEventListener("change", (event) => setProjectValue("tone", event.target.value));
+elements.mustUseInput.addEventListener("input", (event) => setProjectValue("mustUse", event.target.value));
+elements.avoidInput.addEventListener("input", (event) => setProjectValue("avoid", event.target.value));
 elements.manualContentInput.addEventListener("input", (event) => setProjectValue("manualContent", event.target.value));
 elements.analyzeButton.addEventListener("click", analyzeActiveProject);
 elements.resetProjectButton.addEventListener("click", resetActiveProject);
@@ -1071,6 +1216,10 @@ elements.copyBriefButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.briefOutput.value);
   elements.copyBriefButton.textContent = "Kopiert";
   setTimeout(() => (elements.copyBriefButton.textContent = "Briefing kopieren"), 1200);
+});
+elements.copyQualityButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(elements.qualityOutput.value);
+  setButtonFeedback(elements.copyQualityButton, "Kopiert");
 });
 elements.downloadButton.addEventListener("click", () => {
   const name = (activeProject().name || "landing-page").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

@@ -61,6 +61,7 @@
           <nav class="tabs" aria-label="Arbeitsbereiche">
             <button class="tab active" data-tab="setup">Setup</button>
             <button class="tab" data-tab="blueprint">Blueprint</button>
+            <button class="tab" data-tab="quality">Qualität</button>
             <button class="tab" data-tab="briefing">Briefing</button>
             <button class="tab" data-tab="preview">Vorschau</button>
             <button class="tab" data-tab="output">HTML</button>
@@ -114,6 +115,28 @@
                   Zielgruppe oder Positionierung
                   <input id="audienceInput" type="text" placeholder="z. B. Coaches, Steuerberater, SaaS" />
                 </label>
+                <label>
+                  Hauptproblem der Zielgruppe
+                  <input id="problemInput" type="text" placeholder="z. B. Entscheidungen dauern zu lange" />
+                </label>
+                <label>
+                  Hauptnutzen / Ergebnis
+                  <input id="mainBenefitInput" type="text" placeholder="z. B. schneller zu einer belastbaren Entscheidung" />
+                </label>
+                <label>
+                  Gewünschter CTA
+                  <input id="desiredCtaInput" type="text" placeholder="z. B. Demo ansehen, App starten" />
+                </label>
+                <label>
+                  Tonalität
+                  <select id="toneInput">
+                    <option value="">Automatisch aus Vorlage ableiten</option>
+                    <option value="ruhig, hochwertig, vertrauenswürdig">Ruhig und hochwertig</option>
+                    <option value="präzise, sachlich, professionell">Sachlich professionell</option>
+                    <option value="klar, direkt, vertriebsstark">Klar vertriebsstark</option>
+                    <option value="warm, beratend, premium">Warm beratend</option>
+                  </select>
+                </label>
               </div>
 
               <div class="split">
@@ -125,6 +148,16 @@
                   <h3>Analyse-Status</h3>
                   <div id="statusLog" class="status-log"></div>
                 </div>
+              </div>
+              <div class="split compact-split">
+                <label>
+                  Muss verwendet werden
+                  <textarea id="mustUseInput" rows="5" placeholder="Begriffe, Features, Nutzenargumente oder Aussagen, die zwingend in die Landingpage sollen."></textarea>
+                </label>
+                <label>
+                  Nicht verwenden
+                  <textarea id="avoidInput" rows="5" placeholder="Wörter, Claims, Vorlageninhalte oder falsche Aussagen, die nicht erscheinen dürfen."></textarea>
+                </label>
               </div>
             </div>
           </section>
@@ -158,6 +191,33 @@
                 </div>
               </div>
               <textarea id="sourceContentOutput" spellcheck="false" readonly></textarea>
+            </article>
+          </section>
+
+          <section class="tab-panel" id="quality">
+            <div class="quality-grid">
+              <article class="quality-score-card">
+                <span>Qualitäts-Score</span>
+                <strong id="qualityScore">Noch nicht geprüft</strong>
+                <p id="qualitySummary">Nach der Analyse bewertet die App, ob die Landingpage spezifisch, quellenbasiert und professionell genug ist.</p>
+              </article>
+              <article>
+                <h3>Automatische Checks</h3>
+                <div id="qualityChecks" class="quality-checks"></div>
+              </article>
+            </div>
+            <article class="source-content-panel">
+              <div class="section-toolbar">
+                <div>
+                  <h3>Konkrete Nachbesserungsanweisungen</h3>
+                  <p>Diese Punkte werden auch ins Briefing geschrieben, damit Codex gezielt weiterarbeiten kann.</p>
+                </div>
+                <button id="copyQualityButton" class="icon-text-button" type="button" title="Qualitätsanweisungen kopieren" aria-label="Qualitätsanweisungen kopieren">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Kopieren</span>
+                </button>
+              </div>
+              <textarea id="qualityOutput" spellcheck="false" readonly></textarea>
             </article>
           </section>
 
