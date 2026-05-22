@@ -49,6 +49,7 @@ let apiKeyUi = {
   loading: false,
   draft: "",
 };
+let isAnalyzing = false;
 
 function isStaticGitHubPages() {
   return location.protocol === "file:" || location.hostname.endsWith("github.io");
@@ -81,6 +82,7 @@ const elements = {
   audienceInput: document.querySelector("#audienceInput"),
   manualContentInput: document.querySelector("#manualContentInput"),
   statusLog: document.querySelector("#statusLog"),
+  statusPanel: document.querySelector(".status-panel"),
   analyzeButton: document.querySelector("#analyzeButton"),
   testAiButton: document.querySelector("#testAiButton"),
   aiConnectionStatus: document.querySelector("#aiConnectionStatus"),
@@ -278,6 +280,16 @@ function renderStatus(messages = []) {
   elements.statusLog.innerHTML = messages.length
     ? newestFirst.map((message) => `<p>${escapeHtml(message)}</p>`).join("")
     : "<p>Noch keine Analyse gestartet.</p>";
+  renderAnalysisState();
+}
+
+function renderAnalysisState() {
+  elements.statusPanel?.classList.toggle("analyzing", isAnalyzing);
+  elements.statusLog?.classList.toggle("analyzing", isAnalyzing);
+  elements.analyzeButton.classList.toggle("loading", isAnalyzing);
+  elements.analyzeButton.disabled = isAnalyzing;
+  elements.analyzeButton.setAttribute("aria-busy", isAnalyzing ? "true" : "false");
+  elements.analyzeButton.textContent = isAnalyzing ? "Analysiere..." : "Analysieren";
 }
 
 function renderBlueprints() {
@@ -326,64 +338,72 @@ function updateOutput(html) {
 }
 
 async function analyzeActiveProject() {
+  if (isAnalyzing) return;
   const project = activeProject();
-  project.status = [];
-  logStatus("Analyse gestartet.");
+  isAnalyzing = true;
+  renderAnalysisState();
+  try {
+    project.status = [];
+    logStatus("Analyse gestartet.");
 
-  let templateText = "";
-  if (project.templateUrl) {
-    logStatus("Vorlage wird ausgelesen.");
-    const result = await readUrl(project.templateUrl);
-    templateText = result.text || "";
-    logStatus(result.ok ? "Vorlage erfolgreich gelesen." : `Vorlage nicht vollständig lesbar: ${result.error || result.status}`);
-  }
+    let templateText = "";
+    if (project.templateUrl) {
+      logStatus("Vorlage wird ausgelesen.");
+      const result = await readUrl(project.templateUrl);
+      templateText = result.text || "";
+      logStatus(result.ok ? "Vorlage erfolgreich gelesen." : `Vorlage nicht vollständig lesbar: ${result.error || result.status}`);
+    }
 
-  let contentText = project.manualContent || "";
-  if (project.contentUrl) {
-    logStatus("Inhaltsquelle wird ausgelesen.");
-    const result = await readUrl(project.contentUrl);
-    contentText = [result.text || "", project.manualContent || ""].filter(Boolean).join("\n\n");
-    project.sourceContentText = formatSourceContent(contentText);
-    logStatus(result.ok ? "Inhaltsquelle erfolgreich gelesen." : `Inhaltsquelle nicht vollständig lesbar: ${result.error || result.status}`);
-  } else if (project.manualContent) {
-    project.sourceContentText = formatSourceContent(project.manualContent);
-    logStatus("Manuelle Inhalte werden verwendet.");
-  } else {
-    project.sourceContentText = "";
-  }
+    let contentText = project.manualContent || "";
+    if (project.contentUrl) {
+      logStatus("Inhaltsquelle wird ausgelesen.");
+      const result = await readUrl(project.contentUrl);
+      contentText = [result.text || "", project.manualContent || ""].filter(Boolean).join("\n\n");
+      project.sourceContentText = formatSourceContent(contentText);
+      logStatus(result.ok ? "Inhaltsquelle erfolgreich gelesen." : `Inhaltsquelle nicht vollständig lesbar: ${result.error || result.status}`);
+    } else if (project.manualContent) {
+      project.sourceContentText = formatSourceContent(project.manualContent);
+      logStatus("Manuelle Inhalte werden verwendet.");
+    } else {
+      project.sourceContentText = "";
+    }
 
-  if (settings.useAi !== false) {
-    const aiKey = getActiveApiKey();
-    if (aiKey) {
-      logStatus("KI-Erstellung mit Anthropic läuft.");
-      const aiResult = await generateWithAi(project, templateText, contentText, aiKey);
-      if (aiResult.ok) {
-        project.templateAnalysis = aiResult.templateAnalysis;
-        project.contentAnalysis = aiResult.contentAnalysis;
-        project.generatedHtml = aiResult.landingPageHtml;
-        project.briefMarkdown = aiResult.briefMarkdown;
-        logStatus("KI-Landingpage und Briefing wurden erstellt.");
+    if (settings.useAi !== false) {
+      const aiKey = getActiveApiKey();
+      if (aiKey) {
+        logStatus("KI-Erstellung mit Anthropic läuft.");
+        const aiResult = await generateWithAi(project, templateText, contentText, aiKey);
+        if (aiResult.ok) {
+          project.templateAnalysis = aiResult.templateAnalysis;
+          project.contentAnalysis = aiResult.contentAnalysis;
+          project.generatedHtml = aiResult.landingPageHtml;
+          project.briefMarkdown = aiResult.briefMarkdown;
+          logStatus("KI-Landingpage und Briefing wurden erstellt.");
+        } else {
+          logStatus(`KI nicht erfolgreich: ${aiResult.error}`);
+          project.generatedHtml = "";
+          project.briefMarkdown = buildFailureBrief(project, aiResult.error);
+          saveState();
+          render();
+          activateTab("briefing");
+          return;
+        }
       } else {
-        logStatus(`KI nicht erfolgreich: ${aiResult.error}`);
-        project.generatedHtml = "";
-        project.briefMarkdown = buildFailureBrief(project, aiResult.error);
-        saveState();
-        render();
-        activateTab("briefing");
-        return;
+        logStatus("Kein API-Key eingegeben. Fallback-Generator wird verwendet.");
+        applyFallbackGeneration(project, templateText, contentText);
       }
     } else {
-      logStatus("Kein API-Key eingegeben. Fallback-Generator wird verwendet.");
       applyFallbackGeneration(project, templateText, contentText);
+      logStatus("Regelbasierte Landingpage wurde generiert.");
     }
-  } else {
-    applyFallbackGeneration(project, templateText, contentText);
-    logStatus("Regelbasierte Landingpage wurde generiert.");
-  }
 
-  saveState();
-  render();
-  activateTab("preview");
+    saveState();
+    render();
+    activateTab("preview");
+  } finally {
+    isAnalyzing = false;
+    renderAnalysisState();
+  }
 }
 
 function applyFallbackGeneration(project, templateText, contentText) {

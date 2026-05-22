@@ -63,11 +63,21 @@ button:hover {
   transform: translateY(-1px);
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.76;
+  transform: none;
+}
+
 button:active {
   transform: translateY(0);
 }
 
 button.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
@@ -76,6 +86,28 @@ button.primary {
 
 button.primary:hover {
   background: var(--accent-dark);
+}
+
+button.primary.loading::before,
+.status-panel.analyzing h3::after {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: spin 0.72s linear infinite;
+}
+
+button.primary.loading::before {
+  color: #fff;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .app-shell {
@@ -624,6 +656,17 @@ textarea:focus {
   margin: 0 0 14px;
   color: var(--ink-strong);
   font-size: 16px;
+}
+
+.status-panel.analyzing h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.status-panel.analyzing h3::after {
+  color: var(--accent);
 }
 
 .status-log {
