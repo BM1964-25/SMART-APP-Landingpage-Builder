@@ -365,7 +365,6 @@ function getActiveApiKey() {
 function saveApiKey() {
   const candidate = normalizeApiKey(apiKeyUi.draft || (apiKeyUi.visible ? elements.apiKeyInput.value : settings.apiKey));
   if (!candidate) return showAiError("Kein API-Key eingegeben");
-  if (!candidate.startsWith("sk-ant-")) return showAiError("Der Key sollte mit sk-ant- beginnen");
   settings.apiKey = candidate;
   apiKeyUi.draft = "";
   apiKeyUi.visible = false;
@@ -400,7 +399,7 @@ function humanizeConnectionError(message = "") {
     return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
   }
   if (/expected pattern|string did not match/i.test(message)) {
-    return "API-Key-Format nicht lesbar. Bitte Key neu einfügen, beginnend mit sk-ant-.";
+    return "Verbindung zu Anthropic konnte nicht hergestellt werden. Bitte Key erneut speichern und Verbindung testen.";
   }
   return message || "Verbindung fehlgeschlagen";
 }
@@ -414,7 +413,12 @@ function normalizeApiKey(value = "") {
 }
 
 function encodeApiKey(apiKey = "") {
-  return btoa(unescape(encodeURIComponent(apiKey)));
+  const bytes = new TextEncoder().encode(apiKey);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
 }
 
 function maskApiKey(apiKey = "") {
