@@ -22,18 +22,10 @@ int main(void) {
 
   char macosDir[PATH_MAX];
   snprintf(macosDir, sizeof(macosDir), "%s", resolvedPath);
-  dirname(macosDir);
-
-  char projectDir[PATH_MAX];
-  snprintf(projectDir, sizeof(projectDir), "%s/../../..", macosDir);
-
-  char resolvedProjectDir[PATH_MAX];
-  if (realpath(projectDir, resolvedProjectDir) == NULL) {
-    return 1;
-  }
+  char *macosPath = dirname(macosDir);
 
   char launcherScript[PATH_MAX];
-  snprintf(launcherScript, sizeof(launcherScript), "%s/macos/start-launcher.sh", resolvedProjectDir);
+  snprintf(launcherScript, sizeof(launcherScript), "%s/../Resources/start-launcher.sh", macosPath);
 
   pid_t pid = fork();
   if (pid < 0) {

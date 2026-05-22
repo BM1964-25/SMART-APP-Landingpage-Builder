@@ -1,6 +1,8 @@
 #!/bin/zsh
 
-APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+unsetopt BG_NICE 2>/dev/null
+
+APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 LOG_DIR="$APP_DIR/logs"
 LOG_FILE="$LOG_DIR/landingpage-builder-server.log"
 URL="http://127.0.0.1:8173/"
