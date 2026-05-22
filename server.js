@@ -106,28 +106,37 @@ async function generateAiLandingPage(req, res) {
       body: JSON.stringify({
         model,
         max_tokens: 12000,
-        system: `Du bist ein Senior Conversion-Copywriter und Frontend-Designer fuer BuiltSmart-Apps.
-Erstelle eine eigenstaendige Premium-Landingpage im Stil SMART-SnippetFlow:
-- heller Header ueber volle Breite
-- starker Hero mit echtem App-Screenshot als Hintergrund, falls screenshotUrl vorhanden
-- dunkles Overlay im Hero
-- klare grosse Typografie
-- ruhige professionelle Farben
-- hochwertige Buttons
-- dezente Karten
-- grosszuegige Abstaende
-- keine laute SaaS-Seite
-- keine abstrakten Illustrationen
+        system: `Du bist ein Elite-Team aus Creative Director, Conversion Strategist, Senior UX Writer und Principal Frontend Designer fuer BuiltSmart-Apps.
+
+Dein Ziel ist nicht "eine brauchbare Landingpage", sondern ein 10/10 Premium-Ergebnis, das wie eine professionell konzipierte Produktlandingpage wirkt.
+
+Qualitaetsstandard 10/10:
+- Die Seite hat eine klare strategische Positionierung, keine generische SaaS-Sprache.
+- Der Hero muss sofort verstehen lassen: Fuer wen ist die App, welches Problem loest sie, warum ist sie wertvoll?
+- Texte sind praezise, ruhig, vertrauenswuerdig und verkaufsstark. Keine Floskeln wie "revolutionaer", "innovativ", "maximiere dein Potenzial".
+- Jede Section hat eine erkennbare Aufgabe in der Conversion-Story: Aufmerksamkeit, Problem, Loesung, Nutzen, Workflow, Proof, CTA.
+- Design wirkt wie BuiltSmart/SMART-SnippetFlow: heller Header, starker Hero mit App-Screenshot-Hintergrund falls vorhanden, dunkles Overlay, grosse klare Typografie, hochwertige Buttons, dezente Karten, grosszuegige Abstaende, professionelle Farben.
+- Keine abstrakten Illustrationen, keine Emoji-Dekoration, keine ueberladene SaaS-Seite, keine lauten Effekte.
+- Layout muss auf Desktop und Mobile sauber funktionieren, ohne Textueberlagerung.
+- HTML/CSS muss eigenstaendig, sauber strukturiert und direkt im Browser nutzbar sein.
+
+Arbeitsweise:
+1. Analysiere erst die Vorlage: Layoutmuster, Tonalitaet, Sektionen, CTA-System, visuelle Hierarchie.
+2. Analysiere dann die Inhaltsquelle: Angebot, Zielgruppe, Schmerzpunkte, Nutzen, Features, Proof, CTA.
+3. Verdichte daraus ein scharfes Landingpage-Konzept.
+4. Schreibe die Seite neu, nicht nur umsortiert.
+5. Fuehre vor der Ausgabe intern eine Selbstpruefung durch: Wenn das Ergebnis generisch klingt, verbessere es.
+
 Gib ausschliesslich valides JSON zurueck. Keine Markdown-Codefences, keine Erklaerung ausserhalb des JSON.`,
         messages: [
           {
             role: "user",
-            content: `Erstelle aus diesen Daten eine hochwertige Landingpage und ein Codex-freundliches Briefing.
+            content: `Erstelle aus diesen Daten eine High-Professional-Landingpage und ein Codex-freundliches Briefing.
 
 Projekt:
 ${JSON.stringify(source, null, 2)}
 
-Anforderungen:
+Nicht verhandelbare Anforderungen:
 - landingPageHtml muss eine vollstaendige, eigenstaendige HTML-Datei mit inline CSS sein.
 - Die Landingpage muss deutsch sein.
 - Die Texte muessen deutlich besser, spezifischer und verkaufsstaerker sein als eine reine Zusammenfassung.
@@ -136,7 +145,54 @@ Anforderungen:
 - Wenn keine Quelle ausreichend ist, verwende die manuellen Inhalte und markiere Annahmen im Briefing.
 - Keine Platzhalter wie Lorem ipsum.
 - CTA realistisch und klar.
-- briefMarkdown soll enthalten: Positionierung, Zielgruppe, Seitenstruktur, genutzte Quellen, Annahmen, naechste Codex-Schritte.
+- briefMarkdown muss so gut sein, dass Codex die Landingpage danach professionell weiterbearbeiten kann.
+
+Landingpage-Struktur:
+1. Header: hell, minimal, Markenname links, 2-3 Navigationlinks, starker CTA rechts.
+2. Hero: grosser Screenshot-Hintergrund oder hochwertiger dunkler Fallback, dunkles Overlay, praezise Headline, Subline, Primary/Secondary CTA, 2-3 Trust-/Outcome-Pills.
+3. Problem/Context: Warum die Zielgruppe diese App braucht, konkret statt allgemein.
+4. Nutzenkarten: 3-4 hochwertige Nutzen, jede mit klarer Konsequenz fuer Nutzer.
+5. Workflow/Produktlogik: Wie die App arbeitet, in 3-5 Schritten.
+6. Feature-Section: Features nur als Beweis fuer Nutzen, nicht als trockene Liste.
+7. Proof/Trust: Wenn keine echten Beweise vorhanden sind, formuliere glaubwuerdige Prozess- und Qualitaetsargumente ohne falsche Zahlen.
+8. FAQ oder Einwandbehandlung: 3-4 echte Entscheidungsfragen.
+9. Final CTA: ruhig, klar, handlungsorientiert.
+
+Designregeln:
+- Keine Farbexplosion. Nutze dunkles Ink, warmes Off-White, Teal/Green als Akzent, optional Gold nur sparsam.
+- Cards maximal 8px Radius.
+- Keine nested Cards.
+- Keine riesigen Marketing-Floskeln.
+- Abschnitte muessen visuell atmen, aber nicht leer wirken.
+- Buttons hochwertig, klar, konsistent.
+- Mobile CSS mit Breakpoints.
+- Keine externen Fonts, keine externen Libraries.
+
+Copy-Regeln:
+- Headline muss spezifisch sein und darf nicht nur den App-Namen wiederholen.
+- Subline erklaert Outcome plus Mechanismus.
+- Nutze konkrete Verben.
+- Jede Benefit-Karte beantwortet: "Was wird fuer den Nutzer besser?"
+- Keine erfundenen Kunden, Zahlen, Zertifikate oder Testimonials.
+
+Briefing-Anforderungen:
+- Positionierung
+- Zielgruppe
+- Hauptversprechen
+- Seitenstruktur mit Zweck jeder Section
+- Wichtigste Copy-Entscheidungen
+- Designentscheidungen
+- Genutzte Quellen
+- Annahmen und Unsicherheiten
+- Naechste Codex-Schritte fuer finale Veredelung
+
+Interne 10/10-Selbstpruefung vor Ausgabe:
+- Ist die Headline stark genug?
+- Ist der Hero visuell Premium?
+- Klingt die Copy spezifisch zur App?
+- Ist die Seite ohne falsche Behauptungen glaubwuerdig?
+- Ist das HTML direkt nutzbar?
+- Ist Mobile beruecksichtigt?
 
 JSON-Format exakt:
 {

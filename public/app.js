@@ -624,6 +624,17 @@ ${error || "Unbekannter Fehler"}
 - Laeuft die App lokal ueber http://127.0.0.1:8171/ und nicht nur auf GitHub Pages?
 - Klicke im Setup auf "Anthropic-Verbindung testen".
 
+## Fuer 10/10 Ergebnisse benoetigt die KI moeglichst gute Eingangsdaten
+- Konkrete Zielgruppe
+- Hauptproblem und Dringlichkeit
+- Klare App-Loesung
+- 3-5 echte Nutzenargumente
+- Wichtigste Features mit Zweck
+- Workflow der App
+- Proof, Beispiele oder Qualitaetsargumente
+- Gewuenschter CTA
+- Echter App-Screenshot fuer den Hero
+
 ## Projekt
 - Name: ${project.name || "nicht gesetzt"}
 - Vorlage: ${project.templateUrl || "nicht gesetzt"}
