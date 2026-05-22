@@ -84,6 +84,7 @@ const elements = {
   statusLog: document.querySelector("#statusLog"),
   statusPanel: document.querySelector(".status-panel"),
   analyzeButton: document.querySelector("#analyzeButton"),
+  resetProjectButton: document.querySelector("#resetProjectButton"),
   testAiButton: document.querySelector("#testAiButton"),
   aiConnectionStatus: document.querySelector("#aiConnectionStatus"),
   apiDiagnostics: document.querySelector("#apiDiagnostics"),
@@ -201,10 +202,46 @@ function activeProject() {
 }
 
 function setProjectValue(key, value) {
-  activeProject()[key] = value;
+  const project = activeProject();
+  project[key] = value;
+  const shouldClearDerivedData = ["templateUrl", "contentUrl", "screenshotUrl", "audience", "manualContent"].includes(key);
+  if (shouldClearDerivedData) {
+    clearProjectResult(project);
+  }
   if (key === "name") elements.pageTitle.textContent = value || `Landing Page ${activeIndex + 1}`;
   saveState();
+  if (shouldClearDerivedData) {
+    renderStatus(project.status);
+    renderBlueprints();
+    renderSourceContent();
+    renderBriefing();
+    updateOutput("");
+  }
   renderProjectList();
+}
+
+function createEmptyProject(index) {
+  return {
+    ...defaultProjects[index],
+    id: crypto.randomUUID(),
+    name: index === 0 ? "SMART APP & Landingpage Builder" : `Landing Page ${index + 1}`,
+    status: ["Projekt wurde geleert."],
+  };
+}
+
+function clearProjectResult(project) {
+  project.sourceContentText = "";
+  project.templateAnalysis = null;
+  project.contentAnalysis = null;
+  project.briefMarkdown = "";
+  project.generatedHtml = "";
+  project.status = [];
+}
+
+function resetActiveProject() {
+  state[activeIndex] = createEmptyProject(activeIndex);
+  saveState();
+  render();
 }
 
 function isReady(project) {
@@ -1005,6 +1042,7 @@ elements.screenshotUrlInput.addEventListener("input", (event) => setProjectValue
 elements.audienceInput.addEventListener("input", (event) => setProjectValue("audience", event.target.value));
 elements.manualContentInput.addEventListener("input", (event) => setProjectValue("manualContent", event.target.value));
 elements.analyzeButton.addEventListener("click", analyzeActiveProject);
+elements.resetProjectButton.addEventListener("click", resetActiveProject);
 elements.exportButton.addEventListener("click", () => activateTab("output"));
 elements.copyButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.htmlOutput.value);

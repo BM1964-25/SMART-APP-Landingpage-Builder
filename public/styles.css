@@ -88,6 +88,16 @@ button.primary:hover {
   background: var(--accent-dark);
 }
 
+.danger-button {
+  border-color: rgba(200, 90, 59, 0.34);
+  color: var(--signal);
+}
+
+.danger-button:hover {
+  border-color: rgba(200, 90, 59, 0.58);
+  background: #fff5f1;
+}
+
 button.primary.loading::before,
 .status-panel.analyzing h3::after {
   content: "";
