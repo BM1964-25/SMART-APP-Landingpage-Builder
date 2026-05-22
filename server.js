@@ -120,6 +120,11 @@ function compactText(value = "", limit = 80_000) {
   return String(value)
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;|&apos;/gi, "'")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit);
@@ -774,17 +779,56 @@ function mapSectionPurpose(section = "", index = 0) {
   return index < 2 ? "Obere Seitenlogik der Vorlage" : "Passende neue Inhaltssektion";
 }
 
+function isTemplateMetaText(value = "") {
+  const text = String(value || "").trim();
+  if (!text) return true;
+  return /template|blueprint|vorlage\s*\d|site-header|hero\s*\(|product-band|intro-section|workflow-section|audience-section|feature-section|security-section|section-heading|section-lead|hero-copy|hero-pill|hero-metrics|action-buttons|card-grid|use-case-grid|nummernkicker|template-mapping/i.test(text);
+}
+
+function cleanContentItems(items = [], fallback = []) {
+  const cleaned = asStringArray(items)
+    .map((item) => String(item || "").replace(/\s+/g, " ").trim())
+    .filter((item) => item.length > 8 && !isTemplateMetaText(item));
+  return cleaned.length ? cleaned : fallback;
+}
+
+function extractSourceFactsFromCompactContent(value = "", projectName = "") {
+  const compact = String(value || "");
+  const withoutLabels = compact
+    .replace(/CONTENT_SOURCE_FACTS|Title:|Headings und Inhaltsstruktur:|CTA-\/Button-Texte:|Bereinigter Gesamtinhalt:/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const sentenceCandidates = withoutLabels
+    .split(/(?<=[.!?])\s+|\s{2,}|(?:\s+\d+\.\s+)/)
+    .map((item) => item.replace(/^\d+\.\s*/, "").trim())
+    .filter((item) => item.length >= 28 && item.length <= 220)
+    .filter((item) => !isTemplateMetaText(item))
+    .filter((item) => !/cookie|datenschutz|impressum|github|http|javascript|loading/i.test(item));
+  const unique = [...new Set(sentenceCandidates)];
+  const name = projectName || "die Anwendung";
+  const offer = unique[0] || `${name} macht die wichtigsten Inhalte, Funktionen und nächsten Schritte der Anwendung klar verständlich.`;
+  return {
+    headline: unique.find((item) => item.toLowerCase().includes(String(name).toLowerCase())) || `${name}: klarer Nutzen, sauber erklärt.`,
+    offer,
+    benefits: unique.slice(0, 4),
+    features: unique.slice(4, 10),
+    proof: unique.slice(10, 13),
+    summary: unique.slice(0, 6),
+  };
+}
+
 function buildBlueprintLandingPage({ projectName, source = {}, templateAnalysis = {}, contentAnalysis = {} }) {
+  const sourceFacts = extractSourceFactsFromCompactContent(source.contentText, projectName);
   const ctas = takeItems(templateAnalysis.ctas, 2, ["Demo ansehen", "Gespräch starten"]);
-  const benefits = takeItems(contentAnalysis.benefits, 4, ["Klarere Entscheidungen", "Weniger manuelle Arbeit", "Professioneller Ablauf", "Besserer Überblick"]);
-  const features = takeItems(contentAnalysis.features, 6, ["Geführter Workflow", "Strukturierte Auswertung", "Exportfähige Ergebnisse", "Saubere Übersicht", "Praxisnahe Inhalte", "Schnelle Weiterbearbeitung"]);
-  const proof = takeItems(contentAnalysis.proof, 3, ["Aus realer App-Quelle abgeleitet", "Keine erfundenen Referenzen", "Qualitätslogik im Briefing dokumentiert"]);
-  const rawSummary = takeItems(contentAnalysis.rawSummary, 5, [contentAnalysis.offer]);
+  const headline = isTemplateMetaText(contentAnalysis.headline) ? sourceFacts.headline : contentAnalysis.headline;
+  const offer = isTemplateMetaText(contentAnalysis.offer) ? sourceFacts.offer : contentAnalysis.offer;
+  const benefits = takeItems(cleanContentItems(contentAnalysis.benefits, sourceFacts.benefits), 4, sourceFacts.benefits.length ? sourceFacts.benefits : ["Klarere Entscheidungen", "Weniger manuelle Arbeit", "Professioneller Ablauf", "Besserer Überblick"]);
+  const features = takeItems(cleanContentItems(contentAnalysis.features, sourceFacts.features), 6, sourceFacts.features.length ? sourceFacts.features : benefits);
+  const proof = takeItems(cleanContentItems(contentAnalysis.proof, sourceFacts.proof), 3, sourceFacts.proof.length ? sourceFacts.proof : ["Aus realer App-Quelle abgeleitet", "Keine erfundenen Referenzen", "Qualitätslogik im Briefing dokumentiert"]);
+  const rawSummary = takeItems(cleanContentItems(contentAnalysis.rawSummary, sourceFacts.summary), 5, sourceFacts.summary.length ? sourceFacts.summary : [offer]);
   const sections = takeItems(templateAnalysis.sections, 8, ["Hero", "Problem", "Nutzen", "Workflow", "Features", "Proof", "FAQ", "Final CTA"]);
   const screenshot = source.screenshotUrl ? `linear-gradient(90deg, rgba(10,16,19,.92), rgba(10,16,19,.76) 45%, rgba(10,16,19,.38)), url("${cssUrl(source.screenshotUrl)}")` : "linear-gradient(115deg, rgba(10,16,19,.96), rgba(13,74,69,.88) 52%, rgba(185,135,47,.46))";
-  const templateMap = sections
-    .map((section, index) => `<li><span>Vorlage ${index + 1}</span><strong>${escapeHtml(section)}</strong><em>${escapeHtml(mapSectionPurpose(section, index))}</em></li>`)
-    .join("");
 
   return `<!doctype html>
 <html lang="de">
@@ -804,20 +848,20 @@ function buildBlueprintLandingPage({ projectName, source = {}, templateAnalysis 
       .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}.card{min-height:210px;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:24px;box-shadow:var(--shadow)}.card small{display:block;margin-bottom:18px;color:var(--gold);font-weight:900;text-transform:uppercase}
       .workflow{display:grid;grid-template-columns:minmax(280px,.85fr) minmax(0,1.15fr);gap:clamp(28px,5vw,72px);align-items:start}.steps{display:grid;gap:13px;counter-reset:step}.step{counter-increment:step;display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;border:1px solid var(--line);border-radius:8px;padding:20px;background:var(--soft)}.step:before{content:counter(step);display:grid;place-items:center;width:44px;height:44px;border-radius:8px;background:var(--ink);color:#fff;font-weight:900}
       .feature-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.feature{border-left:3px solid var(--accent);background:#fff;padding:18px 18px 18px 20px}.proof{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.proof-item{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:24px}.faq{display:grid;gap:12px}details{border:1px solid var(--line);border-radius:8px;background:#fff;padding:18px 20px}summary{cursor:pointer;font-weight:850}
-      .mapping{background:var(--ink);color:#fff}.mapping p{color:#c8d3d6}.mapping ol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;list-style:none}.mapping li{border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:16px;background:rgba(255,255,255,.06)}.mapping span,.mapping em{display:block;color:#aebcc1;font-style:normal;font-size:13px}
+      .context{display:grid;grid-template-columns:minmax(280px,.9fr) minmax(0,1.1fr);gap:clamp(28px,5vw,72px);align-items:start}.context-panel{border:1px solid var(--line);border-radius:8px;background:#fff;padding:28px;box-shadow:var(--shadow)}
       .final-cta{text-align:center;background:var(--ink);color:#fff}.final-cta p{max-width:720px;margin:0 auto 26px;color:#c8d3d6}
-      @media(max-width:980px){.grid,.feature-list,.proof,.mapping ol{grid-template-columns:repeat(2,minmax(0,1fr))}.workflow{grid-template-columns:1fr}}@media(max-width:680px){.nav-links a:not(.btn){display:none}.grid,.feature-list,.proof,.mapping ol{grid-template-columns:1fr}h1{font-size:42px}.hero{min-height:720px}.btn{width:100%}}
+      @media(max-width:980px){.grid,.feature-list,.proof{grid-template-columns:repeat(2,minmax(0,1fr))}.workflow,.context{grid-template-columns:1fr}}@media(max-width:680px){.nav-links a:not(.btn){display:none}.grid,.feature-list,.proof{grid-template-columns:1fr}h1{font-size:42px}.hero{min-height:720px}.btn{width:100%}}
     </style>
   </head>
   <body>
     <!-- Vorlage: Header -> Neuer App-Header -->
     <nav class="site-nav"><div class="brand"><span class="brand-mark">BS</span>${escapeHtml(projectName)}</div><div class="nav-links"><a href="#nutzen">Nutzen</a><a href="#workflow">Workflow</a><a class="btn" href="#kontakt">${escapeHtml(ctas[0])}</a></div></nav>
     <!-- Vorlage: Hero -> Neue App Hero -->
-    <header class="hero"><div class="hero-inner"><p class="eyebrow">${escapeHtml(templateAnalysis.style || "BuiltSmart Premium")}</p><h1>${escapeHtml(contentAnalysis.headline)}</h1><p class="lead">${escapeHtml(contentAnalysis.offer)}</p><div class="hero-actions"><a class="btn" href="#kontakt">${escapeHtml(ctas[0])}</a><a class="btn secondary" href="#workflow">${escapeHtml(ctas[1])}</a></div><div class="trust-row">${proof.map((item) => `<span>${escapeHtml(titleFromText(item, "Qualitaet"))}</span>`).join("")}</div></div></header>
-    <!-- Vorlage: Template-Mapping -> Umsetzungskontrolle -->
-    <section class="mapping"><div class="section-head"><p class="eyebrow">Template-Mapping</p><h2>Der Aufbau folgt dem Blueprint der Vorlage.</h2><p>Die Struktur wurde aus den erkannten Vorlage-Sections abgeleitet und mit Inhalten der neuen Anwendung befüllt.</p></div><ol>${templateMap}</ol></section>
+    <header class="hero"><div class="hero-inner"><p class="eyebrow">${escapeHtml(projectName)}</p><h1>${escapeHtml(headline)}</h1><p class="lead">${escapeHtml(offer)}</p><div class="hero-actions"><a class="btn" href="#kontakt">${escapeHtml(ctas[0])}</a><a class="btn secondary" href="#workflow">${escapeHtml(ctas[1])}</a></div><div class="trust-row">${proof.map((item) => `<span>${escapeHtml(titleFromText(item, "Qualitaet"))}</span>`).join("")}</div></div></header>
+    <!-- Vorlage: Intro/Problem -> Neue Kontext-Section -->
+    <section class="band"><div class="context"><div class="section-head"><p class="eyebrow">Kontext</p><h2>Warum diese Anwendung relevant ist</h2><p>${escapeHtml(rawSummary[0] || offer)}</p></div><div class="context-panel"><h3>${escapeHtml(titleFromText(rawSummary[1] || benefits[0], "Kernnutzen"))}</h3><p>${escapeHtml(rawSummary[1] || benefits[0] || offer)}</p><p>${escapeHtml(rawSummary[2] || benefits[1] || "Die Seite macht den Nutzen der Anwendung klar, ohne Behauptungen aus der Vorlage zu übernehmen.")}</p></div></div></section>
     <!-- Vorlage: Nutzenkarten -> App-Nutzen -->
-    <section id="nutzen"><div class="section-head"><p class="eyebrow">Nutzen</p><h2>Was für Nutzer konkret besser wird</h2><p>${escapeHtml(rawSummary[0] || contentAnalysis.offer)}</p></div><div class="grid">${benefits.map((item, index) => `<article class="card"><small>0${index + 1}</small><h3>${escapeHtml(titleFromText(item, "Nutzen"))}</h3><p>${escapeHtml(item)}</p></article>`).join("")}</div></section>
+    <section id="nutzen"><div class="section-head"><p class="eyebrow">Nutzen</p><h2>Was für Nutzer konkret besser wird</h2><p>${escapeHtml(rawSummary[0] || offer)}</p></div><div class="grid">${benefits.map((item, index) => `<article class="card"><small>0${index + 1}</small><h3>${escapeHtml(titleFromText(item, "Nutzen"))}</h3><p>${escapeHtml(item)}</p></article>`).join("")}</div></section>
     <!-- Vorlage: Workflow/Product Logic -> Neuer App-Workflow -->
     <section id="workflow" class="band"><div class="workflow"><div class="section-head"><p class="eyebrow">Workflow</p><h2>Vom Bedarf zur verwertbaren Entscheidung</h2><p>Die Landingpage erklärt nicht nur Features, sondern macht die Produktlogik der Anwendung nachvollziehbar.</p></div><div class="steps">${features.slice(0, 4).map((item) => `<div class="step"><div><h3>${escapeHtml(titleFromText(item, "Schritt"))}</h3><p>${escapeHtml(item)}</p></div></div>`).join("")}</div></div></section>
     <!-- Vorlage: Feature Grid -> Funktionen als Nutzenbeweis -->
