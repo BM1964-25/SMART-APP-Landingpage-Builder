@@ -393,7 +393,7 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        apiKeyB64: encodeApiKey(apiKey),
+        apiKey,
         project,
         templateText,
         contentText,
@@ -425,7 +425,7 @@ async function verifyAnthropicConnection({ markConnected = false } = {}) {
     const response = await fetch("/api/test-anthropic", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ apiKeyB64: encodeApiKey(apiKey) }),
+      body: JSON.stringify({ apiKey }),
     });
     const data = await response.json();
     if (response.ok && data.ok) {
@@ -506,15 +506,6 @@ function normalizeApiKey(value = "") {
     .replace(/[\u0000-\u001f\u007f-\u009f\u00a0\u1680\u180e\u2000-\u200f\u2028\u2029\u202f\u205f\u2060\u3000\ufeff\s]/g, "")
     .replace(/[^\x21-\x7e•]/g, "")
     .trim();
-}
-
-function encodeApiKey(apiKey = "") {
-  const bytes = new TextEncoder().encode(apiKey);
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary);
 }
 
 function maskApiKey(apiKey = "") {
