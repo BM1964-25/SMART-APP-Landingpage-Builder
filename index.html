@@ -4,196 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SMART APP &amp; Landingpage Builder</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./github-pages.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <span class="brand-mark">LB</span>
-          <div>
-            <h1>SMART APP &amp; Landingpage Builder</h1>
-            <p>10 Seiten, Musterlinks, Inhaltsquellen</p>
+    <main class="page">
+      <nav class="nav">
+        <div class="brand"><span class="mark">LB</span>SMART APP &amp; Landingpage Builder</div>
+        <a class="link-button secondary" href="http://127.0.0.1:8173/">Lokale App öffnen</a>
+      </nav>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">GitHub Pages Startseite</p>
+          <h1>Die KI-App läuft lokal. GitHub zeigt nur den Einstieg.</h1>
+          <p class="lead">
+            GitHub Pages kann keine Anthropic-Anfragen, URL-Auslesung oder lokalen Dateien verarbeiten.
+            Starte deshalb die lokale App und arbeite dann unter <strong>http://127.0.0.1:8173/</strong>.
+          </p>
+          <div class="actions">
+            <button id="openLocalButton" type="button">Lokale App öffnen</button>
+            <a class="link-button secondary" href="https://github.com/BM1964-25/SMART-APP-Landingpage-Builder">GitHub Repository</a>
           </div>
         </div>
 
-        <div class="progress-card">
-          <div class="progress-row">
-            <span id="progressLabel">0 von 10 bereit</span>
-            <strong id="progressPercent">0%</strong>
-          </div>
-          <div class="meter"><span id="progressMeter"></span></div>
-        </div>
-
-        <div id="projectList" class="project-list"></div>
-      </aside>
-
-      <section class="workspace">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Projekt</p>
-            <h2 id="pageTitle">SMART APP &amp; Landingpage Builder</h2>
-          </div>
-          <div class="topbar-actions">
-            <button id="analyzeButton" class="primary">Analysieren</button>
-            <button id="exportButton">HTML exportieren</button>
-            <button id="exportProjectButton">Projektpaket</button>
-            <button id="resetProjectButton" class="danger-button">Projekt leeren</button>
-          </div>
-        </header>
-
-        <div class="workspace-inner">
-          <div class="command-strip">
-            <div>
-              <strong>Vorlage</strong>
-              <span>Struktur, CTA, Stil</span>
-            </div>
-            <div>
-              <strong>Quelle</strong>
-              <span>Texte, Nutzen, Features</span>
-            </div>
-            <div>
-              <strong>Ausgabe</strong>
-              <span>Vorschau und HTML</span>
-            </div>
-          </div>
-
-          <nav class="tabs" aria-label="Arbeitsbereiche">
-            <button class="tab active" data-tab="setup">Setup</button>
-            <button class="tab" data-tab="blueprint">Blueprint</button>
-            <button class="tab" data-tab="briefing">Briefing</button>
-            <button class="tab" data-tab="preview">Vorschau</button>
-            <button class="tab" data-tab="output">HTML</button>
-          </nav>
-
-          <section class="tab-panel active" id="setup">
-            <div class="panel-surface">
-              <div class="form-grid">
-                <label class="toggle-row">
-                  KI-Modus
-                  <span>
-                    <input id="useAiInput" type="checkbox" checked />
-                    Anthropic nutzen
-                  </span>
-                </label>
-                <div class="api-key-card">
-                  <label for="apiKeyInput">Anthropic API-Key</label>
-                  <div class="api-key-input-row">
-                    <input id="apiKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-..." />
-                    <button id="toggleApiKeyButton" class="icon-button" type="button" aria-label="API-Key anzeigen">
-                      <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6.2 9.8-6.2S21.8 12 21.8 12 18.2 18.2 12 18.2 2.2 12 2.2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
-                      <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.9A10 10 0 0 1 12 5.8c6.2 0 9.8 6.2 9.8 6.2a16.7 16.7 0 0 1-3 3.6"/><path d="M6.7 6.9A16.4 16.4 0 0 0 2.2 12s3.6 6.2 9.8 6.2a9.6 9.6 0 0 0 4-.8"/><path d="M9.9 9.9A3 3 0 0 0 14.1 14.1"/></svg>
-                    </button>
-                  </div>
-                  <div class="api-key-actions">
-                    <button id="saveApiKeyButton" type="button">Speichern</button>
-                    <button id="connectAiButton" type="button">Verbindung</button>
-                    <button id="testAiButton" type="button">Verbindung überprüfen</button>
-                    <button id="disconnectAiButton" type="button">Verbindung trennen</button>
-                  </div>
-                  <span id="aiConnectionStatus">Nicht getestet</span>
-                  <div id="apiDiagnostics" class="api-diagnostics" aria-live="polite"></div>
-                </div>
-                <label>
-                  Name der neuen Landing Page
-                  <input id="nameInput" type="text" placeholder="z. B. Recruiting Funnel Q3" />
-                </label>
-                <label>
-                  Vorlage / Muster-Landing-Page
-                  <input id="templateUrlInput" type="url" placeholder="https://..." />
-                </label>
-                <label>
-                  Inhaltsquelle / App-Link
-                  <input id="contentUrlInput" type="url" placeholder="https://..." />
-                </label>
-                <label>
-                  App-Screenshot für den Hero
-                  <input id="screenshotUrlInput" type="url" placeholder="https://.../screenshot.png" />
-                </label>
-                <label>
-                  Zielgruppe oder Positionierung
-                  <input id="audienceInput" type="text" placeholder="z. B. Coaches, Steuerberater, SaaS" />
-                </label>
-              </div>
-
-              <div class="split">
-                <label>
-                  Manuelle Inhalte, falls der Link nicht lesbar ist
-                  <textarea id="manualContentInput" rows="12" placeholder="Für 10/10 Ergebnisse ideal: App-Name, Zielgruppe, Hauptproblem, Lösung, Nutzen, Features, Workflow, Proof, CTA, Tonalität und echte Differenzierung einfügen."></textarea>
-                </label>
-                <div class="status-panel">
-                  <h3>Analyse-Status</h3>
-                  <div id="statusLog" class="status-log"></div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="tab-panel" id="blueprint">
-            <div class="blueprint-grid">
-              <article>
-                <h3>Muster der Vorlage</h3>
-                <div id="templateBlueprint" class="insight-list"></div>
-              </article>
-              <article>
-                <h3>Extrahierte Inhalte</h3>
-                <div id="contentBlueprint" class="insight-list"></div>
-              </article>
-            </div>
-            <article class="source-content-panel">
-              <div class="section-toolbar">
-                <div>
-                  <h3>Vollständiger Quelleninhalt</h3>
-                  <p>Der ausgelesene Text der Inhaltsquelle, bereinigt und kopierbereit.</p>
-                </div>
-                <div class="icon-action-group">
-                  <button id="copySourceButton" class="icon-text-button" type="button" title="Quelleninhalt kopieren" aria-label="Quelleninhalt kopieren">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    <span>Kopieren</span>
-                  </button>
-                  <button id="clearSourceButton" class="icon-text-button danger" type="button" title="Quelleninhalt leeren" aria-label="Quelleninhalt leeren">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
-                    <span>Leeren</span>
-                  </button>
-                </div>
-              </div>
-              <textarea id="sourceContentOutput" spellcheck="false" readonly></textarea>
-            </article>
-          </section>
-
-          <section class="tab-panel" id="briefing">
-            <div class="output-toolbar">
-              <button id="copyBriefButton">Briefing kopieren</button>
-              <button id="downloadBriefButton">Briefing Download</button>
-            </div>
-            <textarea id="briefOutput" spellcheck="false"></textarea>
-          </section>
-
-          <section class="tab-panel" id="preview">
-            <iframe id="previewFrame" title="Landingpage Vorschau"></iframe>
-          </section>
-
-          <section class="tab-panel" id="output">
-            <div class="output-toolbar">
-              <button id="copyButton" class="icon-text-button" title="HTML vollständig kopieren" aria-label="HTML vollständig kopieren">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span>Kopieren</span>
-              </button>
-              <button id="clearOutputButton" class="icon-text-button danger" title="HTML-Ausgabe leeren" aria-label="HTML-Ausgabe leeren">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
-                <span>Leeren</span>
-              </button>
-              <button id="downloadButton" class="icon-text-button" title="HTML herunterladen" aria-label="HTML herunterladen">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-                <span>Download</span>
-              </button>
-            </div>
-            <textarea id="htmlOutput" spellcheck="false"></textarea>
-          </section>
-        </div>
+        <aside class="panel">
+          <h2>So wird richtig gestartet</h2>
+          <ol>
+            <li>Im Projektordner die App <strong>SMART APP &amp; Landingpage Builder.app</strong> starten.</li>
+            <li>Der lokale Server öffnet <strong>127.0.0.1:8173</strong>.</li>
+            <li>Dort Vorlage, Inhaltsquelle und API-Key verwenden.</li>
+          </ol>
+          <p class="status" id="statusText">Prüfe lokale App...</p>
+        </aside>
       </section>
     </main>
 
-    <script src="./app.js?v=local-proxy-8173-20260522"></script>
+    <script src="./github-pages.js"></script>
   </body>
 </html>
