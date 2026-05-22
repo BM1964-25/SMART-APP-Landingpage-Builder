@@ -78,10 +78,10 @@ async function readUrl(req, res) {
 async function generateAiLandingPage(req, res) {
   try {
     const body = await readJsonBody(req);
-    const apiKey = body.apiKey || process.env.OPENAI_API_KEY;
-    const model = body.model || "gpt-5-mini";
+    const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY;
+    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
     if (!apiKey) {
-      sendJson(res, 400, { error: "Bitte OpenAI API-Key eingeben oder OPENAI_API_KEY setzen." });
+      sendJson(res, 400, { error: "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen." });
       return;
     }
 
@@ -96,16 +96,17 @@ async function generateAiLandingPage(req, res) {
       contentText: compactText(body.contentText),
     };
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
       body: JSON.stringify({
         model,
-        reasoning: { effort: "low" },
-        instructions: `Du bist ein Senior Conversion-Copywriter und Frontend-Designer fuer BuiltSmart-Apps.
+        max_tokens: 12000,
+        system: `Du bist ein Senior Conversion-Copywriter und Frontend-Designer fuer BuiltSmart-Apps.
 Erstelle eine eigenstaendige Premium-Landingpage im Stil SMART-SnippetFlow:
 - heller Header ueber volle Breite
 - starker Hero mit echtem App-Screenshot als Hintergrund, falls screenshotUrl vorhanden
@@ -117,8 +118,8 @@ Erstelle eine eigenstaendige Premium-Landingpage im Stil SMART-SnippetFlow:
 - grosszuegige Abstaende
 - keine laute SaaS-Seite
 - keine abstrakten Illustrationen
-Gib ausschliesslich valides JSON gemaess Schema zurueck.`,
-        input: [
+Gib ausschliesslich valides JSON zurueck. Keine Markdown-Codefences, keine Erklaerung ausserhalb des JSON.`,
+        messages: [
           {
             role: "user",
             content: `Erstelle aus diesen Daten eine hochwertige Landingpage und ein Codex-freundliches Briefing.
@@ -135,68 +136,60 @@ Anforderungen:
 - Wenn keine Quelle ausreichend ist, verwende die manuellen Inhalte und markiere Annahmen im Briefing.
 - Keine Platzhalter wie Lorem ipsum.
 - CTA realistisch und klar.
-- briefMarkdown soll enthalten: Positionierung, Zielgruppe, Seitenstruktur, genutzte Quellen, Annahmen, naechste Codex-Schritte.`,
+- briefMarkdown soll enthalten: Positionierung, Zielgruppe, Seitenstruktur, genutzte Quellen, Annahmen, naechste Codex-Schritte.
+
+JSON-Format exakt:
+{
+  "templateAnalysis": {
+    "headline": "string",
+    "style": "string",
+    "sectionCount": 6,
+    "sections": ["string"],
+    "ctas": ["string"]
+  },
+  "contentAnalysis": {
+    "offer": "string",
+    "headline": "string",
+    "benefits": ["string"],
+    "features": ["string"],
+    "proof": ["string"],
+    "rawSummary": ["string"]
+  },
+  "landingPageHtml": "vollstaendige HTML-Datei",
+  "briefMarkdown": "Markdown Briefing"
+}`,
           },
         ],
-        text: {
-          format: {
-            type: "json_schema",
-            name: "landingpage_builder_output",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                templateAnalysis: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    headline: { type: "string" },
-                    style: { type: "string" },
-                    sectionCount: { type: "number" },
-                    sections: { type: "array", items: { type: "string" } },
-                    ctas: { type: "array", items: { type: "string" } },
-                  },
-                  required: ["headline", "style", "sectionCount", "sections", "ctas"],
-                },
-                contentAnalysis: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    offer: { type: "string" },
-                    headline: { type: "string" },
-                    benefits: { type: "array", items: { type: "string" } },
-                    features: { type: "array", items: { type: "string" } },
-                    proof: { type: "array", items: { type: "string" } },
-                    rawSummary: { type: "array", items: { type: "string" } },
-                  },
-                  required: ["offer", "headline", "benefits", "features", "proof", "rawSummary"],
-                },
-                landingPageHtml: { type: "string" },
-                briefMarkdown: { type: "string" },
-              },
-              required: ["templateAnalysis", "contentAnalysis", "landingPageHtml", "briefMarkdown"],
-            },
-          },
-        },
       }),
     });
 
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { error: data.error?.message || "OpenAI Anfrage fehlgeschlagen." });
+      sendJson(res, response.status, { error: data.error?.message || "Anthropic Anfrage fehlgeschlagen." });
       return;
     }
 
-    const outputText = data.output_text || data.output?.flatMap((item) => item.content || []).find((item) => item.text)?.text;
+    const outputText = data.content?.find((item) => item.type === "text")?.text;
     if (!outputText) {
-      sendJson(res, 502, { error: "OpenAI Antwort enthielt keinen Text." });
+      sendJson(res, 502, { error: "Anthropic Antwort enthielt keinen Text." });
       return;
     }
 
-    sendJson(res, 200, JSON.parse(outputText));
+    sendJson(res, 200, parseJsonResponse(outputText));
   } catch (error) {
     sendJson(res, 500, { error: error.message || "KI-Erstellung fehlgeschlagen." });
+  }
+}
+
+function parseJsonResponse(text) {
+  const trimmed = String(text).trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "");
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
+    throw new Error("Anthropic Antwort war kein gueltiges JSON.");
   }
 }
 

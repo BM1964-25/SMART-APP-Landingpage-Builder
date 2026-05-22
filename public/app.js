@@ -29,7 +29,6 @@ const elements = {
   pageTitle: document.querySelector("#pageTitle"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
   useAiInput: document.querySelector("#useAiInput"),
-  modelSelect: document.querySelector("#modelSelect"),
   nameInput: document.querySelector("#nameInput"),
   templateUrlInput: document.querySelector("#templateUrlInput"),
   contentUrlInput: document.querySelector("#contentUrlInput"),
@@ -70,12 +69,11 @@ function loadSettings() {
   try {
     return {
       useAi: true,
-      model: "gpt-5-mini",
       apiKey: "",
       ...JSON.parse(sessionStorage.getItem(SETTINGS_KEY) || "{}"),
     };
   } catch {
-    return { useAi: true, model: "gpt-5-mini", apiKey: "" };
+    return { useAi: true, apiKey: "" };
   }
 }
 
@@ -134,7 +132,6 @@ function render() {
   elements.pageTitle.textContent = project.name || `Landing Page ${activeIndex + 1}`;
   elements.apiKeyInput.value = settings.apiKey || "";
   elements.useAiInput.checked = settings.useAi !== false;
-  elements.modelSelect.value = settings.model || "gpt-5-mini";
   elements.nameInput.value = project.name || "";
   elements.templateUrlInput.value = project.templateUrl || "";
   elements.contentUrlInput.value = project.contentUrl || "";
@@ -219,7 +216,7 @@ async function analyzeActiveProject() {
   if (settings.useAi !== false) {
     const aiKey = settings.apiKey?.trim();
     if (aiKey) {
-      logStatus(`KI-Erstellung mit ${settings.model || "gpt-5-mini"} läuft.`);
+      logStatus("KI-Erstellung mit Anthropic läuft.");
       const aiResult = await generateWithAi(project, templateText, contentText, aiKey);
       if (aiResult.ok) {
         project.templateAnalysis = aiResult.templateAnalysis;
@@ -267,7 +264,6 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         apiKey,
-        model: settings.model || "gpt-5-mini",
         project,
         templateText,
         contentText,
@@ -611,10 +607,6 @@ elements.apiKeyInput.addEventListener("input", (event) => {
 });
 elements.useAiInput.addEventListener("change", (event) => {
   settings.useAi = event.target.checked;
-  saveSettings();
-});
-elements.modelSelect.addEventListener("change", (event) => {
-  settings.model = event.target.value;
   saveSettings();
 });
 elements.templateUrlInput.addEventListener("input", (event) => setProjectValue("templateUrl", event.target.value));
