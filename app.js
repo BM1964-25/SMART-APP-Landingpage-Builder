@@ -14,6 +14,9 @@ const staleStatusPatterns = [
   /Der Key enthält ein ungültiges Zeichen oder Format/i,
   /ohne Leerzeichen\/Zeilenumbrüche/i,
   /Anthropic-Verbindung fehlgeschlagen/i,
+  /The string did not match the expected pattern/i,
+  /string did not match/i,
+  /expected pattern/i,
 ];
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
@@ -491,6 +494,9 @@ function showAiError(message) {
 function humanizeConnectionError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
     return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
+  }
+  if (/the string did not match the expected pattern|string did not match|expected pattern/i.test(message)) {
+    return "Anthropic konnte den Request nicht annehmen. Der lokale Server hat den Key bereinigt; bitte Verbindung erneut prüfen.";
   }
   return message || "Verbindung fehlgeschlagen";
 }
