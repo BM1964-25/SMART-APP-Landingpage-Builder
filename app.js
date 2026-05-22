@@ -493,10 +493,10 @@ function showAiError(message) {
 
 function humanizeConnectionError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
-    return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
+    return "Anthropic-Modellkennung war ungültig. Die App nutzt jetzt claude-sonnet-4-20250514 als Standard.";
   }
   if (/the string did not match the expected pattern|string did not match|expected pattern/i.test(message)) {
-    return "Anthropic konnte den Request nicht annehmen. Der lokale Server hat den Key bereinigt; bitte Verbindung erneut prüfen.";
+    return "Anthropic konnte den Request nicht annehmen. Geprüft: POST /v1/messages ohne Slash, Modell claude-sonnet-4-20250514.";
   }
   return message || "Verbindung fehlgeschlagen";
 }

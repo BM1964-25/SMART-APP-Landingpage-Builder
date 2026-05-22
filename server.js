@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("./public", import.meta.url));
 const port = Number(process.env.PORT || 8171);
+const anthropicEndpoint = "https://api.anthropic.com/v1/messages";
+const defaultAnthropicModel = "claude-sonnet-4-20250514";
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -80,19 +82,25 @@ function prepareAnthropicHeaderKey(value = "") {
   return normalizeApiKey(value).replace(/[^A-Za-z0-9._-]/g, "");
 }
 
+function getAnthropicModel() {
+  const candidate = String(process.env.ANTHROPIC_MODEL || "").trim();
+  if (/^claude-[A-Za-z0-9._-]+$/.test(candidate)) return candidate;
+  return defaultAnthropicModel;
+}
+
 function humanizeServerError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid/i.test(message)) {
-    return "Interne Anthropic-Modellkennung war ungültig. Die App wurde auf eine gültige Sonnet-ID umgestellt.";
+    return `Interne Anthropic-Modellkennung war ungültig. Standard ist jetzt ${defaultAnthropicModel}.`;
   }
   if (/the string did not match the expected pattern|string did not match|expected pattern/i.test(message)) {
-    return "Anthropic konnte den Request nicht annehmen. Der lokale Server hat den Key bereinigt; bitte Verbindung erneut prüfen.";
+    return `Anthropic konnte den Request nicht annehmen. Geprüft: POST ${anthropicEndpoint}, Modell ${defaultAnthropicModel}.`;
   }
   return message || "Anthropic Anfrage fehlgeschlagen.";
 }
 
 function humanizeAnthropicApiError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid/i.test(message)) {
-    return "Anthropic-Modellkennung war ungültig. Bitte Server neu laden; Standard ist jetzt claude-sonnet-4-5-20250929.";
+    return `Anthropic-Modellkennung war ungültig. Standard ist jetzt ${defaultAnthropicModel}.`;
   }
   return humanizeServerError(message);
 }
@@ -130,7 +138,7 @@ async function generateAiLandingPage(req, res) {
   try {
     const body = await readJsonBody(req);
     const apiKey = prepareAnthropicHeaderKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
-    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
+    const model = getAnthropicModel();
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
@@ -148,7 +156,7 @@ async function generateAiLandingPage(req, res) {
       contentText: compactText(body.contentText),
     };
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(anthropicEndpoint, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -302,14 +310,14 @@ async function testAnthropicConnection(req, res) {
   try {
     const body = await readJsonBody(req, 30_000);
     const apiKey = prepareAnthropicHeaderKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
-    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
+    const model = getAnthropicModel();
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
       return;
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(anthropicEndpoint, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
