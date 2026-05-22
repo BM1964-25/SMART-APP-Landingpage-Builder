@@ -45,7 +45,7 @@ async function readUrl(req, res) {
       const response = await fetch(url, {
         redirect: "follow",
         headers: {
-          "user-agent": "Landingpage App Builder/1.0",
+          "user-agent": "SMART APP&Landingpage Builder/1.0",
           accept: "text/html, text/plain, application/json;q=0.9, */*;q=0.8",
         },
       });
@@ -94,5 +94,5 @@ createServer((req, res) => {
   }
   serveStatic(req, res);
 }).listen(port, () => {
-  console.log(`Landingpage App Builder läuft auf http://127.0.0.1:${port}`);
+  console.log(`SMART APP&Landingpage Builder läuft auf http://127.0.0.1:${port}`);
 });
