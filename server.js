@@ -78,14 +78,63 @@ function validateAnthropicKey(apiKey) {
   return "";
 }
 
-function prepareAnthropicHeaderKey(value = "") {
-  return normalizeApiKey(value).replace(/[^A-Za-z0-9._-]/g, "");
-}
-
 function getAnthropicModel() {
   const candidate = String(process.env.ANTHROPIC_MODEL || "").trim();
   if (/^claude-[A-Za-z0-9._-]+$/.test(candidate)) return candidate;
   return defaultAnthropicModel;
+}
+
+function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getAnthropicModel(), response = null, error = null } = {}) {
+  const bodyPreview = JSON.stringify({
+    model,
+    max_tokens: 64,
+    messages: [{ role: "user", content: "Antworte nur mit OK." }],
+  });
+  return {
+    endpoint: anthropicEndpoint,
+    method: "POST",
+    hasTrailingSlash: anthropicEndpoint.endsWith("/"),
+    contentType: "application/json",
+    bodyType: "string",
+    bodyIsJson: true,
+    model,
+    modelSource: process.env.ANTHROPIC_MODEL ? "env" : "default",
+    keySource: rawKey ? "browser/localStorage" : "env",
+    keyPresent: Boolean(apiKey),
+    keyPrefix: apiKey ? apiKey.slice(0, 13) : "",
+    keyStartsSkAntApi03: apiKey.startsWith("sk-ant-api03-"),
+    keyStartsSkAnt: apiKey.startsWith("sk-ant-"),
+    keyLength: apiKey.length,
+    keyChangedByNormalizer: String(rawKey || "") !== apiKey,
+    keyHasWhitespace: /\s/.test(String(rawKey || "")),
+    keyHasMask: String(rawKey || "").includes("•"),
+    bodyLength: bodyPreview.length,
+    responseStatus: response?.status || null,
+    responseOk: response?.ok ?? null,
+    error: error?.message || null,
+  };
+}
+
+function logApiDiagnostics(diagnostics) {
+  console.log("--- ANTHROPIC API DIAGNOSE ---");
+  console.log("Endpoint:", diagnostics.endpoint);
+  console.log("Method:", diagnostics.method);
+  console.log("Trailing Slash:", diagnostics.hasTrailingSlash);
+  console.log("Content-Type:", diagnostics.contentType);
+  console.log("Body-Typ:", diagnostics.bodyType);
+  console.log("Body JSON valide:", diagnostics.bodyIsJson);
+  console.log("Modell:", diagnostics.model);
+  console.log("Key-Quelle:", diagnostics.keySource);
+  console.log("Key vorhanden:", diagnostics.keyPresent);
+  console.log("Key-Prefix:", diagnostics.keyPrefix);
+  console.log("Key beginnt sk-ant-api03-:", diagnostics.keyStartsSkAntApi03);
+  console.log("Key beginnt sk-ant-:", diagnostics.keyStartsSkAnt);
+  console.log("Key-Laenge:", diagnostics.keyLength);
+  console.log("Key durch Normalisierung veraendert:", diagnostics.keyChangedByNormalizer);
+  console.log("Key enthaelt Whitespace:", diagnostics.keyHasWhitespace);
+  console.log("Key enthaelt Maske:", diagnostics.keyHasMask);
+  if (diagnostics.responseStatus) console.log("Anthropic Status:", diagnostics.responseStatus);
+  if (diagnostics.error) console.log("Fehler:", diagnostics.error);
 }
 
 function humanizeServerError(message = "") {
@@ -137,8 +186,10 @@ async function readUrl(req, res) {
 async function generateAiLandingPage(req, res) {
   try {
     const body = await readJsonBody(req);
-    const apiKey = prepareAnthropicHeaderKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
+    const rawKey = decodeApiKey(body) || process.env.ANTHROPIC_API_KEY || "";
+    const apiKey = normalizeApiKey(rawKey);
     const model = getAnthropicModel();
+    const diagnostics = buildApiDiagnostics({ rawKey, apiKey, model });
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
@@ -156,6 +207,7 @@ async function generateAiLandingPage(req, res) {
       contentText: compactText(body.contentText),
     };
 
+    logApiDiagnostics(diagnostics);
     const response = await fetch(anthropicEndpoint, {
       method: "POST",
       headers: {
@@ -290,7 +342,7 @@ JSON-Format exakt:
 
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { error: humanizeAnthropicApiError(data.error?.message || "Anthropic Anfrage fehlgeschlagen.") });
+      sendJson(res, response.status, { error: humanizeAnthropicApiError(data.error?.message || "Anthropic Anfrage fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
       return;
     }
 
@@ -300,23 +352,26 @@ JSON-Format exakt:
       return;
     }
 
-    sendJson(res, 200, parseJsonResponse(outputText));
+    sendJson(res, 200, { ...parseJsonResponse(outputText), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
   } catch (error) {
-    sendJson(res, 500, { error: humanizeServerError(error.message) });
+    sendJson(res, 500, { error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
 }
 
 async function testAnthropicConnection(req, res) {
   try {
     const body = await readJsonBody(req, 30_000);
-    const apiKey = prepareAnthropicHeaderKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
+    const rawKey = decodeApiKey(body) || process.env.ANTHROPIC_API_KEY || "";
+    const apiKey = normalizeApiKey(rawKey);
     const model = getAnthropicModel();
+    const diagnostics = buildApiDiagnostics({ rawKey, apiKey, model });
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
       sendJson(res, 400, { error: keyError });
       return;
     }
 
+    logApiDiagnostics(diagnostics);
     const response = await fetch(anthropicEndpoint, {
       method: "POST",
       headers: {
@@ -332,14 +387,14 @@ async function testAnthropicConnection(req, res) {
     });
     const data = await response.json();
     if (!response.ok) {
-      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(data.error?.message || "Anthropic Verbindung fehlgeschlagen.") });
+      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(data.error?.message || "Anthropic Verbindung fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
       return;
     }
 
     const text = data.content?.find((item) => item.type === "text")?.text || "";
-    sendJson(res, 200, { ok: true, model, text: text.trim() });
+    sendJson(res, 200, { ok: true, model, text: text.trim(), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, response }) });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: humanizeServerError(error.message) });
+    sendJson(res, 500, { ok: false, error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
 }
 

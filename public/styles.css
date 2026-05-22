@@ -545,6 +545,41 @@ textarea:focus {
   color: var(--signal);
 }
 
+.api-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.api-diagnostics:empty {
+  display: none;
+}
+
+.api-diagnostics div {
+  display: grid;
+  gap: 3px;
+  min-height: 54px;
+  border: 1px solid #e4ecef;
+  border-radius: 8px;
+  background: #f8faf9;
+  padding: 9px 10px;
+}
+
+.api-diagnostics strong {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.api-diagnostics span {
+  overflow-wrap: anywhere;
+  color: var(--ink-strong);
+  font-size: 13px;
+  font-weight: 760;
+}
+
 .field-action {
   display: grid;
   align-content: end;
@@ -828,6 +863,10 @@ textarea:focus {
   }
 
   .api-key-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .api-diagnostics {
     grid-template-columns: 1fr;
   }
 }

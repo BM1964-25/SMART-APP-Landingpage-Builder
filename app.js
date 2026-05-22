@@ -70,6 +70,7 @@ const elements = {
   analyzeButton: document.querySelector("#analyzeButton"),
   testAiButton: document.querySelector("#testAiButton"),
   aiConnectionStatus: document.querySelector("#aiConnectionStatus"),
+  apiDiagnostics: document.querySelector("#apiDiagnostics"),
   exportButton: document.querySelector("#exportButton"),
   templateBlueprint: document.querySelector("#templateBlueprint"),
   contentBlueprint: document.querySelector("#contentBlueprint"),
@@ -255,6 +256,7 @@ function renderApiKeyManager() {
   elements.connectAiButton.classList.toggle("connected", apiKeyUi.connected);
   elements.connectAiButton.classList.toggle("loading", apiKeyUi.loading);
   elements.testAiButton.classList.toggle("loading", apiKeyUi.loading);
+  renderApiDiagnostics();
 }
 
 function renderStatus(messages = []) {
@@ -403,7 +405,8 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
       }),
     });
     const data = await response.json();
-    return response.ok ? { ok: true, ...data } : { ok: false, error: humanizeConnectionError(data.error || "KI-Anfrage fehlgeschlagen.") };
+    if (data.diagnostics) renderApiDiagnostics(data.diagnostics);
+    return response.ok ? { ok: true, ...data } : { ok: false, error: humanizeConnectionError(data.error || "KI-Anfrage fehlgeschlagen."), diagnostics: data.diagnostics };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -435,14 +438,21 @@ async function verifyAnthropicConnection({ markConnected = false } = {}) {
       if (markConnected) apiKeyUi.connected = true;
       elements.aiConnectionStatus.textContent = `Verbunden (${data.model})`;
       elements.aiConnectionStatus.classList.add("ok");
+      renderApiDiagnostics(data.diagnostics);
       logStatus(`Anthropic-Verbindung erfolgreich: ${data.model}`);
     } else {
       const message = humanizeConnectionError(data.error || "Verbindung fehlgeschlagen");
       showAiError(message);
+      renderApiDiagnostics(data.diagnostics);
       logStatus(`Anthropic-Verbindung fehlgeschlagen: ${message || response.status}`);
     }
   } catch (error) {
     showAiError(humanizeConnectionError(error.message));
+    renderApiDiagnostics({
+      endpoint: "/api/test-anthropic",
+      method: "POST",
+      error: humanizeConnectionError(error.message),
+    });
     logStatus(`Anthropic-Verbindung fehlgeschlagen: ${humanizeConnectionError(error.message)}`);
   } finally {
     apiKeyUi.loading = false;
@@ -489,6 +499,35 @@ function toggleApiKeyVisibility() {
 function showAiError(message) {
   elements.aiConnectionStatus.textContent = humanizeConnectionError(message);
   elements.aiConnectionStatus.className = "error";
+}
+
+function renderApiDiagnostics(diagnostics = null) {
+  if (!elements.apiDiagnostics) return;
+  if (!diagnostics) {
+    elements.apiDiagnostics.innerHTML = "";
+    return;
+  }
+  const rows = [
+    ["Endpoint", diagnostics.endpoint || "-"],
+    ["Methode", diagnostics.method || "-"],
+    ["Trailing Slash", diagnostics.hasTrailingSlash ? "ja" : "nein"],
+    ["Content-Type", diagnostics.contentType || "-"],
+    ["Body", `${diagnostics.bodyType || "-"}${diagnostics.bodyIsJson ? ", JSON valide" : ""}`],
+    ["Modell", diagnostics.model || "-"],
+    ["Key-Quelle", diagnostics.keySource || "-"],
+    ["Key-Prefix", diagnostics.keyPrefix || "-"],
+    ["Prefix sk-ant-api03-", diagnostics.keyStartsSkAntApi03 ? "ja" : "nein"],
+    ["Prefix sk-ant-", diagnostics.keyStartsSkAnt ? "ja" : "nein"],
+    ["Key-Länge", diagnostics.keyLength ?? "-"],
+    ["Normalisierung", diagnostics.keyChangedByNormalizer ? "Key wurde verändert" : "unverändert"],
+    ["Whitespace", diagnostics.keyHasWhitespace ? "ja" : "nein"],
+    ["Maskierung", diagnostics.keyHasMask ? "ja" : "nein"],
+    ["HTTP-Status", diagnostics.responseStatus || "-"],
+    ["Fehler", diagnostics.error || "-"],
+  ];
+  elements.apiDiagnostics.innerHTML = rows
+    .map(([label, value]) => `<div><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value)}</span></div>`)
+    .join("");
 }
 
 function humanizeConnectionError(message = "") {
