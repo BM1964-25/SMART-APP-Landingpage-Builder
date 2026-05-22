@@ -274,8 +274,9 @@ function renderApiKeyManager() {
 }
 
 function renderStatus(messages = []) {
+  const newestFirst = [...messages].reverse();
   elements.statusLog.innerHTML = messages.length
-    ? messages.map((message) => `<p>${escapeHtml(message)}</p>`).join("")
+    ? newestFirst.map((message) => `<p>${escapeHtml(message)}</p>`).join("")
     : "<p>Noch keine Analyse gestartet.</p>";
 }
 
