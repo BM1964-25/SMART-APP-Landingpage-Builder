@@ -293,8 +293,9 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
 async function testAiConnection() {
   const apiKey = normalizeApiKey(settings.apiKey);
   elements.aiConnectionStatus.className = "";
-  if (!apiKey) {
-    elements.aiConnectionStatus.textContent = "Kein API-Key eingegeben";
+  const keyError = validateAnthropicKey(apiKey);
+  if (keyError) {
+    elements.aiConnectionStatus.textContent = keyError;
     elements.aiConnectionStatus.classList.add("error");
     return;
   }
@@ -316,14 +317,28 @@ async function testAiConnection() {
       logStatus(`Anthropic-Verbindung fehlgeschlagen: ${data.error || response.status}`);
     }
   } catch (error) {
-    elements.aiConnectionStatus.textContent = error.message;
+    elements.aiConnectionStatus.textContent = humanizeConnectionError(error.message);
     elements.aiConnectionStatus.classList.add("error");
-    logStatus(`Anthropic-Verbindung fehlgeschlagen: ${error.message}`);
+    logStatus(`Anthropic-Verbindung fehlgeschlagen: ${humanizeConnectionError(error.message)}`);
   }
 }
 
+function humanizeConnectionError(message = "") {
+  if (/expected pattern/i.test(message)) {
+    return "Der Key enthält ein ungültiges Zeichen oder Format. Bitte API-Key neu und ohne Leerzeichen/Zeilenumbrüche einfügen.";
+  }
+  return message || "Verbindung fehlgeschlagen";
+}
+
 function normalizeApiKey(value = "") {
-  return String(value).trim().replace(/^Bearer\s*/i, "").trim();
+  return String(value).trim().replace(/^Bearer\s*/i, "").replace(/\s+/g, "").trim();
+}
+
+function validateAnthropicKey(apiKey) {
+  if (!apiKey) return "Kein API-Key eingegeben";
+  if (!apiKey.startsWith("sk-ant-")) return "Der Key sollte mit sk-ant- beginnen";
+  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) return "Der Key enthält ungültige Zeichen";
+  return "";
 }
 
 async function readUrl(url) {

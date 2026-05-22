@@ -47,7 +47,14 @@ function compactText(value = "", limit = 80_000) {
 }
 
 function normalizeApiKey(value = "") {
-  return String(value).trim().replace(/^Bearer\s*/i, "").trim();
+  return String(value).trim().replace(/^Bearer\s*/i, "").replace(/\s+/g, "").trim();
+}
+
+function validateAnthropicKey(apiKey) {
+  if (!apiKey) return "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen.";
+  if (!apiKey.startsWith("sk-ant-")) return "Der API-Key sollte mit sk-ant- beginnen.";
+  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) return "Der API-Key enthält ungültige Zeichen. Bitte ohne Leerzeichen, Zeilenumbrüche oder Anführungszeichen einfügen.";
+  return "";
 }
 
 async function readUrl(req, res) {
@@ -84,8 +91,9 @@ async function generateAiLandingPage(req, res) {
     const body = await readJsonBody(req);
     const apiKey = normalizeApiKey(body.apiKey || process.env.ANTHROPIC_API_KEY);
     const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
-    if (!apiKey) {
-      sendJson(res, 400, { error: "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen." });
+    const keyError = validateAnthropicKey(apiKey);
+    if (keyError) {
+      sendJson(res, 400, { error: keyError });
       return;
     }
 
@@ -255,8 +263,9 @@ async function testAnthropicConnection(req, res) {
     const body = await readJsonBody(req, 30_000);
     const apiKey = normalizeApiKey(body.apiKey || process.env.ANTHROPIC_API_KEY);
     const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
-    if (!apiKey) {
-      sendJson(res, 400, { error: "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen." });
+    const keyError = validateAnthropicKey(apiKey);
+    if (keyError) {
+      sendJson(res, 400, { error: keyError });
       return;
     }
 
