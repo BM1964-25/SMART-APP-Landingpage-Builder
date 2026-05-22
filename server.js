@@ -49,6 +49,7 @@ function compactText(value = "", limit = 80_000) {
 function normalizeApiKey(value = "") {
   return String(value)
     .replace(/^Bearer\s*/i, "")
+    .replace(/^["'`]+|["'`]+$/g, "")
     .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
     .trim();
 }
@@ -56,7 +57,15 @@ function normalizeApiKey(value = "") {
 function validateAnthropicKey(apiKey) {
   if (!apiKey) return "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen.";
   if (!apiKey.startsWith("sk-ant-")) return "Der API-Key sollte mit sk-ant- beginnen.";
+  if (!/^[\x21-\x7e]+$/.test(apiKey)) return "Der API-Key enthält ein nicht erlaubtes Sonderzeichen. Bitte den Key frisch und ohne Anführungszeichen einfügen.";
   return "";
+}
+
+function humanizeServerError(message = "") {
+  if (/expected pattern|string did not match|header value/i.test(message)) {
+    return "API-Key-Format nicht lesbar. Bitte Key neu einfügen, beginnend mit sk-ant-.";
+  }
+  return message || "Anthropic Anfrage fehlgeschlagen.";
 }
 
 async function readUrl(req, res) {
@@ -256,7 +265,7 @@ JSON-Format exakt:
 
     sendJson(res, 200, parseJsonResponse(outputText));
   } catch (error) {
-    sendJson(res, 500, { error: error.message || "KI-Erstellung fehlgeschlagen." });
+    sendJson(res, 500, { error: humanizeServerError(error.message) });
   }
 }
 
@@ -293,7 +302,7 @@ async function testAnthropicConnection(req, res) {
     const text = data.content?.find((item) => item.type === "text")?.text || "";
     sendJson(res, 200, { ok: true, model, text: text.trim() });
   } catch (error) {
-    sendJson(res, 500, { ok: false, error: error.message || "Anthropic Verbindung fehlgeschlagen." });
+    sendJson(res, 500, { ok: false, error: humanizeServerError(error.message) });
   }
 }
 

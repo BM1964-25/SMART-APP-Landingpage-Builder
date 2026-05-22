@@ -284,7 +284,7 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
       }),
     });
     const data = await response.json();
-    return response.ok ? { ok: true, ...data } : { ok: false, error: data.error || "KI-Anfrage fehlgeschlagen." };
+    return response.ok ? { ok: true, ...data } : { ok: false, error: humanizeConnectionError(data.error || "KI-Anfrage fehlgeschlagen.") };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -307,8 +307,9 @@ async function testAiConnection() {
       elements.aiConnectionStatus.classList.add("ok");
       logStatus(`Anthropic-Verbindung erfolgreich: ${data.model}`);
     } else {
-      showAiError(data.error || "Verbindung fehlgeschlagen");
-      logStatus(`Anthropic-Verbindung fehlgeschlagen: ${data.error || response.status}`);
+      const message = humanizeConnectionError(data.error || "Verbindung fehlgeschlagen");
+      showAiError(message);
+      logStatus(`Anthropic-Verbindung fehlgeschlagen: ${message || response.status}`);
     }
   } catch (error) {
     showAiError(humanizeConnectionError(error.message));
@@ -331,6 +332,7 @@ function humanizeConnectionError(message = "") {
 function normalizeApiKey(value = "") {
   return String(value)
     .replace(/^Bearer\s*/i, "")
+    .replace(/^["'`]+|["'`]+$/g, "")
     .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
     .trim();
 }
