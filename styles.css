@@ -430,6 +430,27 @@ textarea:focus {
   box-shadow: none;
 }
 
+.field-action {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+}
+
+.field-action span {
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field-action span.ok {
+  color: var(--accent-dark);
+}
+
+.field-action span.error {
+  color: var(--signal);
+}
+
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 370px;

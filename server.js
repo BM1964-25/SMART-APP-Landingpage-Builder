@@ -181,6 +181,42 @@ JSON-Format exakt:
   }
 }
 
+async function testAnthropicConnection(req, res) {
+  try {
+    const body = await readJsonBody(req, 30_000);
+    const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY;
+    const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+    if (!apiKey) {
+      sendJson(res, 400, { error: "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen." });
+      return;
+    }
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 64,
+        messages: [{ role: "user", content: "Antworte nur mit OK." }],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      sendJson(res, response.status, { ok: false, error: data.error?.message || "Anthropic Verbindung fehlgeschlagen." });
+      return;
+    }
+
+    const text = data.content?.find((item) => item.type === "text")?.text || "";
+    sendJson(res, 200, { ok: true, model, text: text.trim() });
+  } catch (error) {
+    sendJson(res, 500, { ok: false, error: error.message || "Anthropic Verbindung fehlgeschlagen." });
+  }
+}
+
 function parseJsonResponse(text) {
   const trimmed = String(text).trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "");
   try {
@@ -223,6 +259,10 @@ createServer((req, res) => {
   }
   if (req.method === "POST" && req.url === "/api/generate-ai") {
     generateAiLandingPage(req, res);
+    return;
+  }
+  if (req.method === "POST" && req.url === "/api/test-anthropic") {
+    testAnthropicConnection(req, res);
     return;
   }
   serveStatic(req, res);

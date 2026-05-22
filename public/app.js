@@ -37,6 +37,8 @@ const elements = {
   manualContentInput: document.querySelector("#manualContentInput"),
   statusLog: document.querySelector("#statusLog"),
   analyzeButton: document.querySelector("#analyzeButton"),
+  testAiButton: document.querySelector("#testAiButton"),
+  aiConnectionStatus: document.querySelector("#aiConnectionStatus"),
   exportButton: document.querySelector("#exportButton"),
   templateBlueprint: document.querySelector("#templateBlueprint"),
   contentBlueprint: document.querySelector("#contentBlueprint"),
@@ -226,8 +228,12 @@ async function analyzeActiveProject() {
         logStatus("KI-Landingpage und Briefing wurden erstellt.");
       } else {
         logStatus(`KI nicht erfolgreich: ${aiResult.error}`);
-        logStatus("Fallback-Generator wird verwendet.");
-        applyFallbackGeneration(project, templateText, contentText);
+        project.generatedHtml = "";
+        project.briefMarkdown = buildFailureBrief(project, aiResult.error);
+        saveState();
+        render();
+        activateTab("briefing");
+        return;
       }
     } else {
       logStatus("Kein API-Key eingegeben. Fallback-Generator wird verwendet.");
@@ -273,6 +279,38 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
     return response.ok ? { ok: true, ...data } : { ok: false, error: data.error || "KI-Anfrage fehlgeschlagen." };
   } catch (error) {
     return { ok: false, error: error.message };
+  }
+}
+
+async function testAiConnection() {
+  const apiKey = settings.apiKey?.trim();
+  elements.aiConnectionStatus.className = "";
+  if (!apiKey) {
+    elements.aiConnectionStatus.textContent = "Kein API-Key eingegeben";
+    elements.aiConnectionStatus.classList.add("error");
+    return;
+  }
+  elements.aiConnectionStatus.textContent = "Teste Verbindung...";
+  try {
+    const response = await fetch("/api/test-anthropic", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    });
+    const data = await response.json();
+    if (response.ok && data.ok) {
+      elements.aiConnectionStatus.textContent = `Verbunden (${data.model})`;
+      elements.aiConnectionStatus.classList.add("ok");
+      logStatus(`Anthropic-Verbindung erfolgreich: ${data.model}`);
+    } else {
+      elements.aiConnectionStatus.textContent = data.error || "Verbindung fehlgeschlagen";
+      elements.aiConnectionStatus.classList.add("error");
+      logStatus(`Anthropic-Verbindung fehlgeschlagen: ${data.error || response.status}`);
+    }
+  } catch (error) {
+    elements.aiConnectionStatus.textContent = error.message;
+    elements.aiConnectionStatus.classList.add("error");
+    logStatus(`Anthropic-Verbindung fehlgeschlagen: ${error.message}`);
   }
 }
 
@@ -564,6 +602,27 @@ ${(content.benefits || []).map((item) => `- ${item}`).join("\n") || "- Noch kein
 `;
 }
 
+function buildFailureBrief(project, error) {
+  return `# KI-Erstellung fehlgeschlagen
+
+Die Anthropic-Verbindung oder KI-Erstellung war nicht erfolgreich.
+
+## Fehler
+${error || "Unbekannter Fehler"}
+
+## Was pruefen?
+- Ist der Anthropic API-Key korrekt?
+- Ist im Anthropic-Konto API-Billing/Credits aktiv?
+- Laeuft die App lokal ueber http://127.0.0.1:8171/ und nicht nur auf GitHub Pages?
+- Klicke im Setup auf "Anthropic-Verbindung testen".
+
+## Projekt
+- Name: ${project.name || "nicht gesetzt"}
+- Vorlage: ${project.templateUrl || "nicht gesetzt"}
+- Inhaltsquelle: ${project.contentUrl || "nicht gesetzt"}
+`;
+}
+
 function unique(items) {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
 }
@@ -609,6 +668,7 @@ elements.useAiInput.addEventListener("change", (event) => {
   settings.useAi = event.target.checked;
   saveSettings();
 });
+elements.testAiButton.addEventListener("click", testAiConnection);
 elements.templateUrlInput.addEventListener("input", (event) => setProjectValue("templateUrl", event.target.value));
 elements.contentUrlInput.addEventListener("input", (event) => setProjectValue("contentUrl", event.target.value));
 elements.screenshotUrlInput.addEventListener("input", (event) => setProjectValue("screenshotUrl", event.target.value));
