@@ -5,6 +5,10 @@ const staleStatusPatterns = [
   /Verbindung zu Anthropic konnte nicht hergestellt werden/i,
   /Bitte Key erneut speichern und Verbindung testen/i,
   /API-Key-Format nicht lesbar/i,
+  /Der gespeicherte API-Key ist beschädigt/i,
+  /nicht an Anthropic gesendet werden/i,
+  /Der eingefügte API-Key enthält weiterhin ungültige Zeichen/i,
+  /Der API-Key enthält ein nicht erlaubtes Sonderzeichen/i,
 ];
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
@@ -417,10 +421,6 @@ function saveApiKey() {
   }
   const candidate = normalizeApiKey(rawCandidate);
   if (!candidate) return showAiError("Kein API-Key eingegeben");
-  if (!isHeaderSafeApiKey(candidate)) {
-    clearBrokenApiKey();
-    return showAiError("Der eingefügte API-Key enthält weiterhin ungültige Zeichen. Bitte direkt aus der Anthropic Console kopieren.");
-  }
   settings.apiKey = candidate;
   apiKeyUi.draft = "";
   apiKeyUi.visible = false;
@@ -455,13 +455,9 @@ function humanizeConnectionError(message = "") {
     return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
   }
   if (/expected pattern|string did not match|header value|bytestring|invalid character/i.test(message)) {
-    return "Der gespeicherte API-Key ist beschädigt oder enthält Zeichen, die nicht an Anthropic gesendet werden können. Bitte den Original-Key einmal neu einfügen.";
+    return "Technischer Verbindungsfehler beim Senden an Anthropic. Key wurde bereinigt; bitte Verbindung erneut prüfen.";
   }
   return message || "Verbindung fehlgeschlagen";
-}
-
-function isHeaderSafeApiKey(apiKey = "") {
-  return /^[\x21-\x7e]+$/.test(apiKey);
 }
 
 function normalizeApiKey(value = "") {

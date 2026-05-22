@@ -73,7 +73,6 @@ function decodeApiKey(body = {}) {
 function validateAnthropicKey(apiKey) {
   if (!apiKey) return "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen.";
   if (apiKey.includes("•")) return "Der gespeicherte API-Key ist nur die maskierte Anzeige und nicht der echte Key. Bitte den Original-Key einmal neu einfügen.";
-  if (!/^[\x21-\x7e]+$/.test(apiKey)) return "Der API-Key enthält ein nicht erlaubtes Sonderzeichen. Bitte den Key frisch und ohne Anführungszeichen einfügen.";
   return "";
 }
 
@@ -82,7 +81,7 @@ function humanizeServerError(message = "") {
     return "Interne Anthropic-Modellkennung war ungültig. Die App wurde auf eine gültige Sonnet-ID umgestellt.";
   }
   if (/expected pattern|string did not match|header value|bytestring|invalid character/i.test(message)) {
-    return "Der gespeicherte API-Key ist beschädigt oder enthält Zeichen, die nicht an Anthropic gesendet werden können. Bitte den Original-Key einmal neu einfügen.";
+    return "Technischer Verbindungsfehler beim Senden an Anthropic. Key wurde bereinigt; bitte Verbindung erneut prüfen.";
   }
   return message || "Anthropic Anfrage fehlgeschlagen.";
 }
