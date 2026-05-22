@@ -75,12 +75,21 @@
                     Anthropic nutzen
                   </span>
                 </label>
-                <label>
-                  Anthropic API-Key
-                  <input id="apiKeyInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-..." />
-                </label>
-                <div class="field-action">
-                  <button id="testAiButton" type="button">Anthropic-Verbindung testen</button>
+                <div class="api-key-card">
+                  <label for="apiKeyInput">Anthropic API-Key</label>
+                  <div class="api-key-input-row">
+                    <input id="apiKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-..." />
+                    <button id="toggleApiKeyButton" class="icon-button" type="button" aria-label="API-Key anzeigen">
+                      <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6.2 9.8-6.2S21.8 12 21.8 12 18.2 18.2 12 18.2 2.2 12 2.2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.9A10 10 0 0 1 12 5.8c6.2 0 9.8 6.2 9.8 6.2a16.7 16.7 0 0 1-3 3.6"/><path d="M6.7 6.9A16.4 16.4 0 0 0 2.2 12s3.6 6.2 9.8 6.2a9.6 9.6 0 0 0 4-.8"/><path d="M9.9 9.9A3 3 0 0 0 14.1 14.1"/></svg>
+                    </button>
+                  </div>
+                  <div class="api-key-actions">
+                    <button id="saveApiKeyButton" type="button">Speichern</button>
+                    <button id="connectAiButton" type="button">Verbindung</button>
+                    <button id="testAiButton" type="button">Verbindung überprüfen</button>
+                    <button id="disconnectAiButton" type="button">Verbindung trennen</button>
+                  </div>
                   <span id="aiConnectionStatus">Nicht getestet</span>
                 </div>
                 <label>

@@ -20,6 +20,12 @@ const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
 let state = loadState();
 let settings = loadSettings();
 let activeIndex = 0;
+let apiKeyUi = {
+  visible: false,
+  connected: false,
+  loading: false,
+  draft: "",
+};
 
 const elements = {
   projectList: document.querySelector("#projectList"),
@@ -28,6 +34,10 @@ const elements = {
   progressMeter: document.querySelector("#progressMeter"),
   pageTitle: document.querySelector("#pageTitle"),
   apiKeyInput: document.querySelector("#apiKeyInput"),
+  toggleApiKeyButton: document.querySelector("#toggleApiKeyButton"),
+  saveApiKeyButton: document.querySelector("#saveApiKeyButton"),
+  connectAiButton: document.querySelector("#connectAiButton"),
+  disconnectAiButton: document.querySelector("#disconnectAiButton"),
   useAiInput: document.querySelector("#useAiInput"),
   nameInput: document.querySelector("#nameInput"),
   templateUrlInput: document.querySelector("#templateUrlInput"),
@@ -77,18 +87,22 @@ function migrateProject(project, index) {
 
 function loadSettings() {
   try {
-    return {
+    const legacy = JSON.parse(sessionStorage.getItem(SETTINGS_KEY) || "{}");
+    const loaded = {
       useAi: true,
       apiKey: "",
-      ...JSON.parse(sessionStorage.getItem(SETTINGS_KEY) || "{}"),
+      ...legacy,
+      ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"),
     };
+    if (loaded.apiKey?.includes("•")) loaded.apiKey = "";
+    return loaded;
   } catch {
     return { useAi: true, apiKey: "" };
   }
 }
 
 function saveSettings() {
-  sessionStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 function saveState() {
@@ -140,8 +154,8 @@ function renderProjectList() {
 function render() {
   const project = activeProject();
   elements.pageTitle.textContent = project.name || `Landing Page ${activeIndex + 1}`;
-  elements.apiKeyInput.value = settings.apiKey || "";
   elements.useAiInput.checked = settings.useAi !== false;
+  renderApiKeyManager();
   elements.nameInput.value = project.name || "";
   elements.templateUrlInput.value = project.templateUrl || "";
   elements.contentUrlInput.value = project.contentUrl || "";
@@ -153,6 +167,23 @@ function render() {
   renderBriefing();
   updateOutput(project.generatedHtml || buildLandingPage(project));
   renderProjectList();
+}
+
+function renderApiKeyManager() {
+  const savedKey = normalizeApiKey(settings.apiKey);
+  const draftKey = apiKeyUi.draft;
+  const hasDraft = draftKey.length > 0;
+  const displayRaw = apiKeyUi.visible ? draftKey || savedKey : draftKey;
+
+  elements.apiKeyInput.readOnly = Boolean(!apiKeyUi.visible && savedKey && !hasDraft);
+  elements.apiKeyInput.type = apiKeyUi.visible || !savedKey || hasDraft ? (apiKeyUi.visible ? "text" : "password") : "text";
+  elements.apiKeyInput.value = !apiKeyUi.visible && savedKey && !hasDraft ? maskApiKey(savedKey) : displayRaw;
+  elements.toggleApiKeyButton.classList.toggle("visible", apiKeyUi.visible);
+  elements.toggleApiKeyButton.setAttribute("aria-label", apiKeyUi.visible ? "API-Key verbergen" : "API-Key anzeigen");
+  elements.connectAiButton.textContent = apiKeyUi.connected ? "Verbindung ok" : "Verbindung";
+  elements.connectAiButton.classList.toggle("connected", apiKeyUi.connected);
+  elements.connectAiButton.classList.toggle("loading", apiKeyUi.loading);
+  elements.testAiButton.classList.toggle("loading", apiKeyUi.loading);
 }
 
 function renderStatus(messages = []) {
@@ -224,7 +255,7 @@ async function analyzeActiveProject() {
   }
 
   if (settings.useAi !== false) {
-    const aiKey = settings.apiKey?.trim();
+    const aiKey = getActiveApiKey();
     if (aiKey) {
       logStatus("KI-Erstellung mit Anthropic läuft.");
       const aiResult = await generateWithAi(project, templateText, contentText, aiKey);
@@ -291,9 +322,15 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
 }
 
 async function testAiConnection() {
-  const apiKey = normalizeApiKey(settings.apiKey);
+  return verifyAnthropicConnection({ markConnected: true });
+}
+
+async function verifyAnthropicConnection({ markConnected = false } = {}) {
+  const apiKey = getActiveApiKey();
   elements.aiConnectionStatus.className = "";
   if (!apiKey) return showAiError("Kein API-Key eingegeben");
+  apiKeyUi.loading = true;
+  renderApiKeyManager();
   elements.aiConnectionStatus.textContent = "Teste Verbindung...";
   try {
     const response = await fetch("/api/test-anthropic", {
@@ -303,6 +340,7 @@ async function testAiConnection() {
     });
     const data = await response.json();
     if (response.ok && data.ok) {
+      if (markConnected) apiKeyUi.connected = true;
       elements.aiConnectionStatus.textContent = `Verbunden (${data.model})`;
       elements.aiConnectionStatus.classList.add("ok");
       logStatus(`Anthropic-Verbindung erfolgreich: ${data.model}`);
@@ -314,7 +352,42 @@ async function testAiConnection() {
   } catch (error) {
     showAiError(humanizeConnectionError(error.message));
     logStatus(`Anthropic-Verbindung fehlgeschlagen: ${humanizeConnectionError(error.message)}`);
+  } finally {
+    apiKeyUi.loading = false;
+    renderApiKeyManager();
   }
+}
+
+function getActiveApiKey() {
+  return normalizeApiKey(apiKeyUi.draft || settings.apiKey);
+}
+
+function saveApiKey() {
+  const candidate = normalizeApiKey(apiKeyUi.draft || (apiKeyUi.visible ? elements.apiKeyInput.value : settings.apiKey));
+  if (!candidate) return showAiError("Kein API-Key eingegeben");
+  if (!candidate.startsWith("sk-ant-")) return showAiError("Der Key sollte mit sk-ant- beginnen");
+  settings.apiKey = candidate;
+  apiKeyUi.draft = "";
+  apiKeyUi.visible = false;
+  apiKeyUi.connected = false;
+  saveSettings();
+  elements.aiConnectionStatus.textContent = `Gespeichert: ${maskApiKey(candidate)}`;
+  elements.aiConnectionStatus.className = "ok";
+  renderApiKeyManager();
+}
+
+function disconnectAiConnection() {
+  apiKeyUi.connected = false;
+  elements.aiConnectionStatus.textContent = settings.apiKey ? "Verbindung getrennt. Key bleibt gespeichert." : "Verbindung getrennt.";
+  elements.aiConnectionStatus.className = "";
+  renderApiKeyManager();
+}
+
+function toggleApiKeyVisibility() {
+  apiKeyUi.visible = !apiKeyUi.visible;
+  apiKeyUi.draft = apiKeyUi.draft || normalizeApiKey(settings.apiKey);
+  renderApiKeyManager();
+  elements.apiKeyInput.focus();
 }
 
 function showAiError(message) {
@@ -335,6 +408,12 @@ function normalizeApiKey(value = "") {
     .replace(/^["'`]+|["'`]+$/g, "")
     .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
     .trim();
+}
+
+function maskApiKey(apiKey = "") {
+  const clean = normalizeApiKey(apiKey);
+  if (!clean) return "";
+  return `${clean.slice(0, 7)}${"•".repeat(10)}`;
 }
 
 async function readUrl(url) {
@@ -695,9 +774,26 @@ function activateTab(id) {
 
 elements.nameInput.addEventListener("input", (event) => setProjectValue("name", event.target.value));
 elements.apiKeyInput.addEventListener("input", (event) => {
-  settings.apiKey = event.target.value;
-  saveSettings();
+  if (elements.apiKeyInput.readOnly) return;
+  apiKeyUi.draft = event.target.value;
+  apiKeyUi.connected = false;
+  elements.aiConnectionStatus.textContent = "Nicht gespeichert";
+  elements.aiConnectionStatus.className = "";
 });
+elements.apiKeyInput.addEventListener("focus", () => {
+  if (!elements.apiKeyInput.readOnly) return;
+  apiKeyUi.draft = "";
+  apiKeyUi.visible = false;
+  elements.apiKeyInput.readOnly = false;
+  elements.apiKeyInput.type = "password";
+  elements.apiKeyInput.value = "";
+  elements.aiConnectionStatus.textContent = "Neuen Key eingeben oder Auge zum Anzeigen nutzen";
+  elements.aiConnectionStatus.className = "";
+});
+elements.toggleApiKeyButton.addEventListener("click", toggleApiKeyVisibility);
+elements.saveApiKeyButton.addEventListener("click", saveApiKey);
+elements.connectAiButton.addEventListener("click", () => verifyAnthropicConnection({ markConnected: true }));
+elements.disconnectAiButton.addEventListener("click", disconnectAiConnection);
 elements.useAiInput.addEventListener("change", (event) => {
   settings.useAi = event.target.checked;
   saveSettings();

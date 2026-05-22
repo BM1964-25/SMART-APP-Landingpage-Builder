@@ -430,6 +430,92 @@ textarea:focus {
   box-shadow: none;
 }
 
+.api-key-card {
+  display: grid;
+  gap: 8px;
+  grid-column: span 2;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.api-key-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  gap: 8px;
+}
+
+.api-key-input-row input[readonly] {
+  color: var(--muted);
+  background: #f8faf9;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  padding: 0;
+}
+
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-button .eye-closed {
+  display: none;
+}
+
+.icon-button.visible .eye-open {
+  display: none;
+}
+
+.icon-button.visible .eye-closed {
+  display: block;
+}
+
+.api-key-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.api-key-actions button {
+  min-width: 0;
+}
+
+.api-key-actions button.connected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.api-key-actions button.loading {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.api-key-card > span {
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.api-key-card > span.ok {
+  color: var(--accent-dark);
+}
+
+.api-key-card > span.error {
+  color: var(--signal);
+}
+
 .field-action {
   display: grid;
   align-content: end;
@@ -644,6 +730,14 @@ textarea:focus {
   }
 
   .tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .api-key-card {
+    grid-column: span 1;
+  }
+
+  .api-key-actions {
     grid-template-columns: 1fr;
   }
 }
