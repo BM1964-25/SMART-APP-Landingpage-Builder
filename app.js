@@ -1,6 +1,11 @@
 const STORAGE_KEY = "landingpage-app-builder-v1";
 const SETTINGS_KEY = "landingpage-app-builder-settings-v1";
 const projectCount = 10;
+const staleStatusPatterns = [
+  /Verbindung zu Anthropic konnte nicht hergestellt werden/i,
+  /Bitte Key erneut speichern und Verbindung testen/i,
+  /API-Key-Format nicht lesbar/i,
+];
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   id: crypto.randomUUID(),
@@ -17,6 +22,7 @@ const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   status: [],
 }));
 
+let shouldSaveMigratedState = false;
 let state = loadState();
 let settings = loadSettings();
 let activeIndex = 0;
@@ -82,6 +88,13 @@ function migrateProject(project, index) {
   if (index === 0 && (!migrated.name || migrated.name === "SMART Landingpage Builder" || migrated.name === "SMART APP&Landingpage Builder")) {
     migrated.name = "SMART APP & Landingpage Builder";
   }
+  if (Array.isArray(migrated.status)) {
+    const cleanedStatus = migrated.status.filter((message) => !staleStatusPatterns.some((pattern) => pattern.test(String(message))));
+    if (cleanedStatus.length !== migrated.status.length) {
+      migrated.status = cleanedStatus;
+      shouldSaveMigratedState = true;
+    }
+  }
   return migrated;
 }
 
@@ -108,6 +121,8 @@ function saveSettings() {
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
+if (shouldSaveMigratedState) saveState();
 
 function activeProject() {
   return state[activeIndex];
