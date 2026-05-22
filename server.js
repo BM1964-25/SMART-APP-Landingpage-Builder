@@ -47,13 +47,15 @@ function compactText(value = "", limit = 80_000) {
 }
 
 function normalizeApiKey(value = "") {
-  return String(value).trim().replace(/^Bearer\s*/i, "").replace(/\s+/g, "").trim();
+  return String(value)
+    .replace(/^Bearer\s*/i, "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
+    .trim();
 }
 
 function validateAnthropicKey(apiKey) {
   if (!apiKey) return "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen.";
   if (!apiKey.startsWith("sk-ant-")) return "Der API-Key sollte mit sk-ant- beginnen.";
-  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) return "Der API-Key enthält ungültige Zeichen. Bitte ohne Leerzeichen, Zeilenumbrüche oder Anführungszeichen einfügen.";
   return "";
 }
 

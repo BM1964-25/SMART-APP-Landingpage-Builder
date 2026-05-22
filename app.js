@@ -293,12 +293,7 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
 async function testAiConnection() {
   const apiKey = normalizeApiKey(settings.apiKey);
   elements.aiConnectionStatus.className = "";
-  const keyError = validateAnthropicKey(apiKey);
-  if (keyError) {
-    elements.aiConnectionStatus.textContent = keyError;
-    elements.aiConnectionStatus.classList.add("error");
-    return;
-  }
+  if (!apiKey) return showAiError("Kein API-Key eingegeben");
   elements.aiConnectionStatus.textContent = "Teste Verbindung...";
   try {
     const response = await fetch("/api/test-anthropic", {
@@ -312,33 +307,32 @@ async function testAiConnection() {
       elements.aiConnectionStatus.classList.add("ok");
       logStatus(`Anthropic-Verbindung erfolgreich: ${data.model}`);
     } else {
-      elements.aiConnectionStatus.textContent = data.error || "Verbindung fehlgeschlagen";
-      elements.aiConnectionStatus.classList.add("error");
+      showAiError(data.error || "Verbindung fehlgeschlagen");
       logStatus(`Anthropic-Verbindung fehlgeschlagen: ${data.error || response.status}`);
     }
   } catch (error) {
-    elements.aiConnectionStatus.textContent = humanizeConnectionError(error.message);
-    elements.aiConnectionStatus.classList.add("error");
+    showAiError(humanizeConnectionError(error.message));
     logStatus(`Anthropic-Verbindung fehlgeschlagen: ${humanizeConnectionError(error.message)}`);
   }
 }
 
+function showAiError(message) {
+  elements.aiConnectionStatus.textContent = humanizeConnectionError(message);
+  elements.aiConnectionStatus.className = "error";
+}
+
 function humanizeConnectionError(message = "") {
-  if (/expected pattern/i.test(message)) {
-    return "Der Key enthält ein ungültiges Zeichen oder Format. Bitte API-Key neu und ohne Leerzeichen/Zeilenumbrüche einfügen.";
+  if (/expected pattern|string did not match/i.test(message)) {
+    return "API-Key-Format nicht lesbar. Bitte Key neu einfügen, beginnend mit sk-ant-.";
   }
   return message || "Verbindung fehlgeschlagen";
 }
 
 function normalizeApiKey(value = "") {
-  return String(value).trim().replace(/^Bearer\s*/i, "").replace(/\s+/g, "").trim();
-}
-
-function validateAnthropicKey(apiKey) {
-  if (!apiKey) return "Kein API-Key eingegeben";
-  if (!apiKey.startsWith("sk-ant-")) return "Der Key sollte mit sk-ant- beginnen";
-  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) return "Der Key enthält ungültige Zeichen";
-  return "";
+  return String(value)
+    .replace(/^Bearer\s*/i, "")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff\s]/g, "")
+    .trim();
 }
 
 async function readUrl(url) {
