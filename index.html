@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Landingpage App Builder</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">LB</span>
+          <div>
+            <h1>Landingpage Builder</h1>
+            <p>10 Seiten, Musterlinks, Inhaltsquellen</p>
+          </div>
+        </div>
+
+        <div class="progress-card">
+          <div class="progress-row">
+            <span id="progressLabel">0 von 10 bereit</span>
+            <strong id="progressPercent">0%</strong>
+          </div>
+          <div class="meter"><span id="progressMeter"></span></div>
+        </div>
+
+        <div id="projectList" class="project-list"></div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Projekt</p>
+            <h2 id="pageTitle">Landing Page 1</h2>
+          </div>
+          <div class="topbar-actions">
+            <button id="analyzeButton" class="primary">Analysieren</button>
+            <button id="exportButton">HTML exportieren</button>
+          </div>
+        </header>
+
+        <div class="workspace-inner">
+          <div class="command-strip">
+            <div>
+              <strong>Vorlage</strong>
+              <span>Struktur, CTA, Stil</span>
+            </div>
+            <div>
+              <strong>Quelle</strong>
+              <span>Texte, Nutzen, Features</span>
+            </div>
+            <div>
+              <strong>Ausgabe</strong>
+              <span>Vorschau und HTML</span>
+            </div>
+          </div>
+
+          <nav class="tabs" aria-label="Arbeitsbereiche">
+            <button class="tab active" data-tab="setup">Setup</button>
+            <button class="tab" data-tab="blueprint">Blueprint</button>
+            <button class="tab" data-tab="preview">Vorschau</button>
+            <button class="tab" data-tab="output">HTML</button>
+          </nav>
+
+          <section class="tab-panel active" id="setup">
+            <div class="panel-surface">
+              <div class="form-grid">
+                <label>
+                  Name der neuen Landing Page
+                  <input id="nameInput" type="text" placeholder="z. B. Recruiting Funnel Q3" />
+                </label>
+                <label>
+                  Vorlage / Muster-Landing-Page
+                  <input id="templateUrlInput" type="url" placeholder="https://..." />
+                </label>
+                <label>
+                  Inhaltsquelle / App-Link
+                  <input id="contentUrlInput" type="url" placeholder="https://..." />
+                </label>
+                <label>
+                  App-Screenshot für den Hero
+                  <input id="screenshotUrlInput" type="url" placeholder="https://.../screenshot.png" />
+                </label>
+                <label>
+                  Zielgruppe oder Positionierung
+                  <input id="audienceInput" type="text" placeholder="z. B. Coaches, Steuerberater, SaaS" />
+                </label>
+              </div>
+
+              <div class="split">
+                <label>
+                  Manuelle Inhalte, falls der Link nicht lesbar ist
+                  <textarea id="manualContentInput" rows="12" placeholder="Text, Features, Angebot, Testimonials oder bestehende App-Inhalte einfügen"></textarea>
+                </label>
+                <div class="status-panel">
+                  <h3>Analyse-Status</h3>
+                  <div id="statusLog" class="status-log"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="blueprint">
+            <div class="blueprint-grid">
+              <article>
+                <h3>Muster der Vorlage</h3>
+                <div id="templateBlueprint" class="insight-list"></div>
+              </article>
+              <article>
+                <h3>Extrahierte Inhalte</h3>
+                <div id="contentBlueprint" class="insight-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="preview">
+            <iframe id="previewFrame" title="Landingpage Vorschau"></iframe>
+          </section>
+
+          <section class="tab-panel" id="output">
+            <div class="output-toolbar">
+              <button id="copyButton">Kopieren</button>
+              <button id="downloadButton">Download</button>
+            </div>
+            <textarea id="htmlOutput" spellcheck="false"></textarea>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
