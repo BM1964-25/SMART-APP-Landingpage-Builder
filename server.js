@@ -87,6 +87,27 @@ function validateAnthropicKey(apiKey) {
   return "";
 }
 
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return { data: JSON.parse(text || "{}"), text };
+  } catch {
+    return { data: {}, text };
+  }
+}
+
+function pickResponseHeaders(response) {
+  if (!response) return {};
+  return {
+    "content-type": response.headers.get("content-type") || "",
+    server: response.headers.get("server") || "",
+    via: response.headers.get("via") || "",
+    "cf-ray": response.headers.get("cf-ray") || "",
+    "request-id": response.headers.get("request-id") || "",
+    "anthropic-request-id": response.headers.get("anthropic-request-id") || "",
+  };
+}
+
 function getConfiguredAnthropicModel() {
   const candidate = String(process.env.ANTHROPIC_MODEL || "").trim();
   if (allowedAnthropicModels.has(candidate)) return candidate;
@@ -102,17 +123,19 @@ async function resolveAnthropicModel(apiKey) {
         "anthropic-version": "2023-06-01",
       },
     });
-    const data = await response.json();
+    const { data, text } = await readJsonResponse(response);
     const models = Array.isArray(data.data) ? data.data.map((item) => item.id).filter(Boolean) : [];
     const configured = getConfiguredAnthropicModel();
     const model = models.includes(configured) ? configured : models[0] || configured;
     return {
       ok: response.ok,
       status: response.status,
+      statusText: response.statusText,
+      responseHeaders: pickResponseHeaders(response),
       model,
       modelSource: models.includes(configured) ? "configured" : models[0] ? "models_api_first" : "fallback",
       availableModels: models.slice(0, 8),
-      error: data.error?.message || "",
+      error: data.error?.message || (!response.ok ? text.slice(0, 180) : ""),
     };
   } catch (error) {
     return {
@@ -126,7 +149,7 @@ async function resolveAnthropicModel(apiKey) {
   }
 }
 
-function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getConfiguredAnthropicModel(), modelLookup = null, response = null, error = null } = {}) {
+function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getConfiguredAnthropicModel(), modelLookup = null, response = null, responseText = "", apiError = "", error = null } = {}) {
   const bodyPreview = JSON.stringify({
     model,
     max_tokens: 64,
@@ -143,9 +166,13 @@ function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getConfiguredAn
     modelSource: modelLookup?.modelSource || (process.env.ANTHROPIC_MODEL ? "env" : "default"),
     modelsEndpoint: anthropicModelsEndpoint,
     modelsStatus: modelLookup?.status || null,
+    modelsStatusText: modelLookup?.statusText || "",
     modelsOk: modelLookup?.ok ?? null,
     availableModels: modelLookup?.availableModels || [],
     modelsError: modelLookup?.error || "",
+    modelsResponseServer: modelLookup?.responseHeaders?.server || "",
+    modelsResponseVia: modelLookup?.responseHeaders?.via || "",
+    modelsResponseContentType: modelLookup?.responseHeaders?.["content-type"] || "",
     keySource: rawKey ? "browser/localStorage" : "env",
     keyPresent: Boolean(apiKey),
     keyPrefix: apiKey ? apiKey.slice(0, 13) : "",
@@ -157,7 +184,15 @@ function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getConfiguredAn
     keyHasMask: String(rawKey || "").includes("•"),
     bodyLength: bodyPreview.length,
     responseStatus: response?.status || null,
+    responseStatusText: response?.statusText || "",
     responseOk: response?.ok ?? null,
+    responseServer: response?.headers?.get("server") || "",
+    responseVia: response?.headers?.get("via") || "",
+    responseContentType: response?.headers?.get("content-type") || "",
+    responseCfRay: response?.headers?.get("cf-ray") || "",
+    responseRequestId: response?.headers?.get("request-id") || response?.headers?.get("anthropic-request-id") || "",
+    responseTextPreview: responseText ? String(responseText).slice(0, 180) : "",
+    apiError,
     error: error?.message || null,
   };
 }
@@ -173,6 +208,8 @@ function logApiDiagnostics(diagnostics) {
   console.log("Modell:", diagnostics.model);
   console.log("Modell-Quelle:", diagnostics.modelSource);
   console.log("Models API Status:", diagnostics.modelsStatus);
+  console.log("Models API Server:", diagnostics.modelsResponseServer || "-");
+  console.log("Models API Content-Type:", diagnostics.modelsResponseContentType || "-");
   console.log("Verfuegbare Modelle:", diagnostics.availableModels.join(", ") || "-");
   console.log("Key-Quelle:", diagnostics.keySource);
   console.log("Key vorhanden:", diagnostics.keyPresent);
@@ -184,6 +221,11 @@ function logApiDiagnostics(diagnostics) {
   console.log("Key enthaelt Whitespace:", diagnostics.keyHasWhitespace);
   console.log("Key enthaelt Maske:", diagnostics.keyHasMask);
   if (diagnostics.responseStatus) console.log("Anthropic Status:", diagnostics.responseStatus);
+  if (diagnostics.responseStatusText) console.log("Anthropic Status Text:", diagnostics.responseStatusText);
+  if (diagnostics.responseServer) console.log("Anthropic Response Server:", diagnostics.responseServer);
+  if (diagnostics.responseContentType) console.log("Anthropic Response Content-Type:", diagnostics.responseContentType);
+  if (diagnostics.responseRequestId) console.log("Anthropic Request ID:", diagnostics.responseRequestId);
+  if (diagnostics.apiError) console.log("Anthropic API Fehler:", diagnostics.apiError);
   if (diagnostics.error) console.log("Fehler:", diagnostics.error);
 }
 
@@ -395,9 +437,10 @@ JSON-Format exakt:
       }),
     });
 
-    const data = await response.json();
+    const { data, text: responseText } = await readJsonResponse(response);
     if (!response.ok) {
-      sendJson(res, response.status, { error: humanizeAnthropicApiError(data.error?.message || "Anthropic Anfrage fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
+      const apiError = data.error?.message || responseText.slice(0, 180) || "Anthropic Anfrage fehlgeschlagen.";
+      sendJson(res, response.status, { error: humanizeAnthropicApiError(apiError), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response, responseText, apiError }) });
       return;
     }
 
@@ -407,7 +450,7 @@ JSON-Format exakt:
       return;
     }
 
-    sendJson(res, 200, { ...parseJsonResponse(outputText), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
+    sendJson(res, 200, { ...parseJsonResponse(outputText), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response, responseText }) });
   } catch (error) {
     sendJson(res, 500, { error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
@@ -445,14 +488,15 @@ async function testAnthropicConnection(req, res) {
         messages: [{ role: "user", content: "Antworte nur mit OK." }],
       }),
     });
-    const data = await response.json();
+    const { data, text: responseText } = await readJsonResponse(response);
     if (!response.ok) {
-      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(data.error?.message || "Anthropic Verbindung fehlgeschlagen."), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
+      const apiError = data.error?.message || responseText.slice(0, 180) || "Anthropic Verbindung fehlgeschlagen.";
+      sendJson(res, response.status, { ok: false, error: humanizeAnthropicApiError(apiError), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response, responseText, apiError }) });
       return;
     }
 
     const text = data.content?.find((item) => item.type === "text")?.text || "";
-    sendJson(res, 200, { ok: true, model, text: text.trim(), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response }) });
+    sendJson(res, 200, { ok: true, model, text: text.trim(), diagnostics: buildApiDiagnostics({ rawKey, apiKey, model, modelLookup, response, responseText }) });
   } catch (error) {
     sendJson(res, 500, { ok: false, error: humanizeServerError(error.message), diagnostics: buildApiDiagnostics({ error }) });
   }
