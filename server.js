@@ -125,6 +125,79 @@ function compactText(value = "", limit = 80_000) {
     .slice(0, limit);
 }
 
+function collectMatches(value = "", pattern, limit = 30) {
+  return [...String(value).matchAll(pattern)]
+    .map((match) => compactText(match[1] || match[0], 2_000))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function compactTemplateSource(value = "", limit = 120_000) {
+  const raw = String(value || "");
+  const title = compactText(raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "", 300);
+  const styles = collectMatches(raw, /<style[^>]*>([\s\S]*?)<\/style>/gi, 8).join("\n").slice(0, 20_000);
+  const headings = collectMatches(raw, /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi, 24);
+  const navItems = collectMatches(raw, /<(?:nav|header)[^>]*>([\s\S]*?)<\/(?:nav|header)>/gi, 4);
+  const buttons = collectMatches(raw, /<(?:a|button)[^>]*>([\s\S]*?)<\/(?:a|button)>/gi, 24);
+  const sectionHints = [...raw.matchAll(/<(section|header|footer|main|article|div)\b([^>]*)>/gi)]
+    .map((match) => compactText(`${match[1]} ${match[2]}`, 400))
+    .filter((item) => /class=|id=|hero|cta|feature|benefit|workflow|faq|card|grid|section|nav|button/i.test(item))
+    .slice(0, 80)
+    .join("\n");
+  const colors = [...new Set((raw.match(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)/g) || []).slice(0, 80))].join(", ");
+  const text = compactText(raw, 60_000);
+
+  return compactText(
+    `TEMPLATE_URL_DESIGNDIGEST
+Title: ${title}
+
+Headings in Reihenfolge:
+${headings.map((item, index) => `${index + 1}. ${item}`).join("\n")}
+
+Navigation/Header/CTA Muster:
+${navItems.join("\n---\n")}
+
+Button- und CTA-Texte:
+${buttons.join(" | ")}
+
+Layout-/Klassen-/Section-Hinweise:
+${sectionHints}
+
+CSS-/Farbhinweise:
+${colors}
+
+Style-Auszug:
+${styles}
+
+Bereinigter Seiteninhalt:
+${text}`,
+    limit,
+  );
+}
+
+function compactContentSource(value = "", limit = 120_000) {
+  const raw = String(value || "");
+  const title = compactText(raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "", 300);
+  const headings = collectMatches(raw, /<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/gi, 40);
+  const buttons = collectMatches(raw, /<(?:a|button)[^>]*>([\s\S]*?)<\/(?:a|button)>/gi, 30);
+  const text = compactText(raw, 95_000);
+
+  return compactText(
+    `CONTENT_SOURCE_FACTS
+Title: ${title}
+
+Headings und Inhaltsstruktur:
+${headings.map((item, index) => `${index + 1}. ${item}`).join("\n")}
+
+CTA-/Button-Texte:
+${buttons.join(" | ")}
+
+Bereinigter Gesamtinhalt:
+${text}`,
+    limit,
+  );
+}
+
 function normalizeApiKey(value = "") {
   return String(value)
     .normalize("NFKC")
@@ -377,8 +450,8 @@ async function generateAiLandingPage(req, res) {
       templateUrl: project.templateUrl || "",
       contentUrl: project.contentUrl || "",
       screenshotUrl: project.screenshotUrl || "",
-      templateText: compactText(body.templateText),
-      contentText: compactText(body.contentText),
+      templateText: compactTemplateSource(body.templateText),
+      contentText: compactContentSource(body.contentText),
     };
 
     logApiDiagnostics(diagnostics);
@@ -395,6 +468,7 @@ async function generateAiLandingPage(req, res) {
         system: `Du bist ein Elite-Team aus Creative Director, Conversion Strategist, Senior UX Writer und Principal Frontend Designer fuer BuiltSmart-Apps.
 
 Dein Ziel ist nicht "eine brauchbare Landingpage", sondern ein 10/10 Premium-Ergebnis, das wie eine professionell konzipierte Produktlandingpage wirkt.
+Der Kernauftrag: Die neue Landingpage muss vom Aufbau, Rhythmus, visuellen Stil, CTA-System und Section-Logik der Vorlage erkennbar abgeleitet sein. Die Inhalte duerfen dagegen nur aus der Inhaltsquelle der neuen Anwendung stammen.
 
 Qualitaetsstandard 10/10:
 - Die Seite hat eine klare strategische Positionierung, keine generische SaaS-Sprache.
@@ -408,8 +482,8 @@ Qualitaetsstandard 10/10:
 
 Arbeitsweise:
 1. Extrahiere alle Vorgaben selbst aus der Vorlage und Inhaltsquelle. Manuelle Inhalte sind nur Ergaenzung.
-2. Analysiere die Vorlage: Layoutmuster, Hero-Aufbau, Header, Sektionen, CTA-System, visuelle Hierarchie, Farben, Typografie, Button-Stil, Card-Stil, Abstaende, Tonalitaet.
-3. Analysiere die Inhaltsquelle: Angebot, Zielgruppe, Schmerzpunkte, Nutzen, Features, Workflow, Proof, CTA, Fachbegriffe, konkrete App-Funktionen.
+2. Analysiere die Vorlage als Design- und Aufbau-Muster: Header, Hero-Komposition, Section-Reihenfolge, CTA-System, visuelle Hierarchie, Farben, Typografie, Button-Stil, Card-Stil, Abstaende, Tonalitaet, Footer. Uebernehme diese Struktur sinngemaess.
+3. Analysiere die Inhaltsquelle als Faktenquelle: Angebot, Zielgruppe, Schmerzpunkte, Nutzen, Features, Workflow, Proof, CTA, Fachbegriffe, konkrete App-Funktionen. Nutze keine Inhaltsbehauptungen aus der Vorlage.
 4. Trenne strikt: "aus Quelle erkannt" vs. "Annahme". Erfinde keine Fakten.
 5. Verdichte daraus ein scharfes Landingpage-Konzept.
 6. Schreibe die Seite neu, nicht nur umsortiert.
@@ -425,9 +499,10 @@ Projekt:
 ${JSON.stringify(source, null, 2)}
 
 Nicht verhandelbare Anforderungen:
-- Hole die Vorgaben primaer selbst aus templateText und contentText.
-- Nutze templateText fuer Design, Struktur, Stil, CTA-Logik und Seitenmuster.
-- Nutze contentText fuer App-Inhalte, Nutzen, Zielgruppe, Features, Workflow und Proof.
+- templateText ist die Vorlage. Nutze sie fuer Aufbau, Section-Reihenfolge, Header-/Hero-System, Button-Stil, Kartenlogik, Farben, Abstaende und Tonalitaet.
+- contentText ist die Inhaltsquelle der neuen Anwendung. Nutze sie fuer ALLE Inhalte: App-Name, Zielgruppe, Nutzen, Features, Workflow, Proof, CTA und Fachbegriffe.
+- Vermische die Inhalte der Vorlage nicht mit der neuen Anwendung.
+- Die neue Landingpage soll nicht identisch kopieren, aber sichtbar nach demselben Muster gebaut sein.
 - Nutze manuelle Inhalte nur als Ergaenzung oder Ersatz, falls eine Quelle wenig hergibt.
 - Markiere fehlende Informationen und Annahmen explizit im briefMarkdown.
 - landingPageHtml muss eine vollstaendige, eigenstaendige HTML-Datei mit inline CSS sein.
@@ -452,6 +527,8 @@ Landingpage-Struktur:
 9. Final CTA: ruhig, klar, handlungsorientiert.
 
 Designregeln:
+- Beginne mit einer kurzen internen Template-Mapping-Entscheidung: Welche Vorlage-Section wird zu welcher neuen Section? Setze dieses Mapping im HTML um.
+- Wenn die Vorlage einen hellen Header, dunklen Screenshot-Hero, dezente Karten und ruhige Premium-Abstaende hat, muss die neue Landingpage dieselbe visuelle Grammatik tragen.
 - Keine Farbexplosion. Nutze dunkles Ink, warmes Off-White, Teal/Green als Akzent, optional Gold nur sparsam.
 - Cards maximal 8px Radius.
 - Keine nested Cards.
