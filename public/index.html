@@ -138,6 +138,25 @@
                 <div id="contentBlueprint" class="insight-list"></div>
               </article>
             </div>
+            <article class="source-content-panel">
+              <div class="section-toolbar">
+                <div>
+                  <h3>Vollständiger Quelleninhalt</h3>
+                  <p>Der ausgelesene Text der Inhaltsquelle, bereinigt und kopierbereit.</p>
+                </div>
+                <div class="icon-action-group">
+                  <button id="copySourceButton" class="icon-text-button" type="button" title="Quelleninhalt kopieren" aria-label="Quelleninhalt kopieren">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>Kopieren</span>
+                  </button>
+                  <button id="clearSourceButton" class="icon-text-button danger" type="button" title="Quelleninhalt leeren" aria-label="Quelleninhalt leeren">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                    <span>Leeren</span>
+                  </button>
+                </div>
+              </div>
+              <textarea id="sourceContentOutput" spellcheck="false" readonly></textarea>
+            </article>
           </section>
 
           <section class="tab-panel" id="briefing">
@@ -154,8 +173,18 @@
 
           <section class="tab-panel" id="output">
             <div class="output-toolbar">
-              <button id="copyButton">Kopieren</button>
-              <button id="downloadButton">Download</button>
+              <button id="copyButton" class="icon-text-button" title="HTML vollständig kopieren" aria-label="HTML vollständig kopieren">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Kopieren</span>
+              </button>
+              <button id="clearOutputButton" class="icon-text-button danger" title="HTML-Ausgabe leeren" aria-label="HTML-Ausgabe leeren">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+                <span>Leeren</span>
+              </button>
+              <button id="downloadButton" class="icon-text-button" title="HTML herunterladen" aria-label="HTML herunterladen">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                <span>Download</span>
+              </button>
             </div>
             <textarea id="htmlOutput" spellcheck="false"></textarea>
           </section>

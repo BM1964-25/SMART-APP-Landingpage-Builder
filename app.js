@@ -15,6 +15,7 @@ const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   screenshotUrl: "",
   audience: "",
   manualContent: "",
+  sourceContentText: "",
   templateAnalysis: null,
   contentAnalysis: null,
   briefMarkdown: "",
@@ -58,10 +59,14 @@ const elements = {
   exportButton: document.querySelector("#exportButton"),
   templateBlueprint: document.querySelector("#templateBlueprint"),
   contentBlueprint: document.querySelector("#contentBlueprint"),
+  sourceContentOutput: document.querySelector("#sourceContentOutput"),
   previewFrame: document.querySelector("#previewFrame"),
   htmlOutput: document.querySelector("#htmlOutput"),
   briefOutput: document.querySelector("#briefOutput"),
   copyButton: document.querySelector("#copyButton"),
+  clearOutputButton: document.querySelector("#clearOutputButton"),
+  copySourceButton: document.querySelector("#copySourceButton"),
+  clearSourceButton: document.querySelector("#clearSourceButton"),
   copyBriefButton: document.querySelector("#copyBriefButton"),
   downloadButton: document.querySelector("#downloadButton"),
   downloadBriefButton: document.querySelector("#downloadBriefButton"),
@@ -95,6 +100,7 @@ function migrateProject(project, index) {
       shouldSaveMigratedState = true;
     }
   }
+  migrated.sourceContentText = migrated.sourceContentText || "";
   return migrated;
 }
 
@@ -179,6 +185,7 @@ function render() {
   elements.manualContentInput.value = project.manualContent || "";
   renderStatus(project.status);
   renderBlueprints();
+  renderSourceContent();
   renderBriefing();
   updateOutput(project.generatedHtml || buildLandingPage(project));
   renderProjectList();
@@ -241,6 +248,12 @@ function renderContentAnalysis(analysis) {
   `;
 }
 
+function renderSourceContent() {
+  const project = activeProject();
+  const sourceText = project.sourceContentText || "";
+  elements.sourceContentOutput.value = sourceText || "Noch kein Quelleninhalt ausgelesen. Trage eine Inhaltsquelle ein und starte die Analyse.";
+}
+
 function updateOutput(html) {
   elements.htmlOutput.value = html;
   elements.previewFrame.srcdoc = html;
@@ -264,9 +277,13 @@ async function analyzeActiveProject() {
     logStatus("Inhaltsquelle wird ausgelesen.");
     const result = await readUrl(project.contentUrl);
     contentText = [result.text || "", project.manualContent || ""].filter(Boolean).join("\n\n");
+    project.sourceContentText = formatSourceContent(contentText);
     logStatus(result.ok ? "Inhaltsquelle erfolgreich gelesen." : `Inhaltsquelle nicht vollständig lesbar: ${result.error || result.status}`);
   } else if (project.manualContent) {
+    project.sourceContentText = formatSourceContent(project.manualContent);
     logStatus("Manuelle Inhalte werden verwendet.");
+  } else {
+    project.sourceContentText = "";
   }
 
   if (settings.useAi !== false) {
@@ -690,6 +707,14 @@ function htmlToText(value = "") {
     .trim();
 }
 
+function formatSourceContent(value = "") {
+  return htmlToText(value)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function estimateSectionCount(html) {
   const matches = (html || "").match(/<section|<article|class=["'][^"']*(section|hero|feature|benefit|testimonial|faq|pricing|cta)/gi);
   return Math.min(10, Math.max(4, matches ? matches.length : 4));
@@ -862,8 +887,23 @@ elements.analyzeButton.addEventListener("click", analyzeActiveProject);
 elements.exportButton.addEventListener("click", () => activateTab("output"));
 elements.copyButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.htmlOutput.value);
-  elements.copyButton.textContent = "Kopiert";
-  setTimeout(() => (elements.copyButton.textContent = "Kopieren"), 1200);
+  setButtonFeedback(elements.copyButton, "Kopiert");
+});
+elements.clearOutputButton.addEventListener("click", () => {
+  activeProject().generatedHtml = "";
+  saveState();
+  updateOutput("");
+  setButtonFeedback(elements.clearOutputButton, "Geleert");
+});
+elements.copySourceButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(activeProject().sourceContentText || "");
+  setButtonFeedback(elements.copySourceButton, "Kopiert");
+});
+elements.clearSourceButton.addEventListener("click", () => {
+  activeProject().sourceContentText = "";
+  saveState();
+  renderSourceContent();
+  setButtonFeedback(elements.clearSourceButton, "Geleert");
 });
 elements.copyBriefButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(elements.briefOutput.value);
@@ -913,6 +953,23 @@ function downloadText(filename, content, type) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function setButtonFeedback(button, label) {
+  const labelElement = button.querySelector("span");
+  const original = labelElement ? labelElement.textContent : button.textContent;
+  if (labelElement) {
+    labelElement.textContent = label;
+  } else {
+    button.textContent = label;
+  }
+  setTimeout(() => {
+    if (labelElement) {
+      labelElement.textContent = original;
+    } else {
+      button.textContent = original;
+    }
+  }, 1200);
 }
 
 document.querySelectorAll(".tab").forEach((button) => {
