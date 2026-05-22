@@ -76,6 +76,10 @@ function validateAnthropicKey(apiKey) {
   return "";
 }
 
+function prepareAnthropicHeaderKey(value = "") {
+  return normalizeApiKey(value).replace(/[^A-Za-z0-9._-]/g, "");
+}
+
 function humanizeServerError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid/i.test(message)) {
     return "Interne Anthropic-Modellkennung war ungültig. Die App wurde auf eine gültige Sonnet-ID umgestellt.";
@@ -122,7 +126,7 @@ async function readUrl(req, res) {
 async function generateAiLandingPage(req, res) {
   try {
     const body = await readJsonBody(req);
-    const apiKey = normalizeApiKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
+    const apiKey = prepareAnthropicHeaderKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
     const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
@@ -294,7 +298,7 @@ JSON-Format exakt:
 async function testAnthropicConnection(req, res) {
   try {
     const body = await readJsonBody(req, 30_000);
-    const apiKey = normalizeApiKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
+    const apiKey = prepareAnthropicHeaderKey(decodeApiKey(body) || process.env.ANTHROPIC_API_KEY);
     const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
     const keyError = validateAnthropicKey(apiKey);
     if (keyError) {
