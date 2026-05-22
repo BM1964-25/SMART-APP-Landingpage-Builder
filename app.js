@@ -1,4 +1,5 @@
 const STORAGE_KEY = "landingpage-app-builder-v1";
+const SETTINGS_KEY = "landingpage-app-builder-settings-v1";
 const projectCount = 10;
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
@@ -11,11 +12,13 @@ const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
   manualContent: "",
   templateAnalysis: null,
   contentAnalysis: null,
+  briefMarkdown: "",
   generatedHtml: "",
   status: [],
 }));
 
 let state = loadState();
+let settings = loadSettings();
 let activeIndex = 0;
 
 const elements = {
@@ -24,6 +27,9 @@ const elements = {
   progressPercent: document.querySelector("#progressPercent"),
   progressMeter: document.querySelector("#progressMeter"),
   pageTitle: document.querySelector("#pageTitle"),
+  apiKeyInput: document.querySelector("#apiKeyInput"),
+  useAiInput: document.querySelector("#useAiInput"),
+  modelSelect: document.querySelector("#modelSelect"),
   nameInput: document.querySelector("#nameInput"),
   templateUrlInput: document.querySelector("#templateUrlInput"),
   contentUrlInput: document.querySelector("#contentUrlInput"),
@@ -37,8 +43,12 @@ const elements = {
   contentBlueprint: document.querySelector("#contentBlueprint"),
   previewFrame: document.querySelector("#previewFrame"),
   htmlOutput: document.querySelector("#htmlOutput"),
+  briefOutput: document.querySelector("#briefOutput"),
   copyButton: document.querySelector("#copyButton"),
+  copyBriefButton: document.querySelector("#copyBriefButton"),
   downloadButton: document.querySelector("#downloadButton"),
+  downloadBriefButton: document.querySelector("#downloadBriefButton"),
+  exportProjectButton: document.querySelector("#exportProjectButton"),
 };
 
 function loadState() {
@@ -54,6 +64,23 @@ function loadState() {
     // Ignore malformed local data.
   }
   return defaultProjects;
+}
+
+function loadSettings() {
+  try {
+    return {
+      useAi: true,
+      model: "gpt-5-mini",
+      apiKey: "",
+      ...JSON.parse(sessionStorage.getItem(SETTINGS_KEY) || "{}"),
+    };
+  } catch {
+    return { useAi: true, model: "gpt-5-mini", apiKey: "" };
+  }
+}
+
+function saveSettings() {
+  sessionStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 function saveState() {
@@ -105,6 +132,9 @@ function renderProjectList() {
 function render() {
   const project = activeProject();
   elements.pageTitle.textContent = project.name || `Landing Page ${activeIndex + 1}`;
+  elements.apiKeyInput.value = settings.apiKey || "";
+  elements.useAiInput.checked = settings.useAi !== false;
+  elements.modelSelect.value = settings.model || "gpt-5-mini";
   elements.nameInput.value = project.name || "";
   elements.templateUrlInput.value = project.templateUrl || "";
   elements.contentUrlInput.value = project.contentUrl || "";
@@ -113,6 +143,7 @@ function render() {
   elements.manualContentInput.value = project.manualContent || "";
   renderStatus(project.status);
   renderBlueprints();
+  renderBriefing();
   updateOutput(project.generatedHtml || buildLandingPage(project));
   renderProjectList();
 }
@@ -132,6 +163,11 @@ function renderBlueprints() {
   elements.contentBlueprint.innerHTML = project.contentAnalysis
     ? renderContentAnalysis(project.contentAnalysis)
     : `<div class="insight"><strong>Keine Inhalte extrahiert</strong><span>Nutze eine Inhaltsquelle oder manuelle Inhalte.</span></div>`;
+}
+
+function renderBriefing() {
+  const project = activeProject();
+  elements.briefOutput.value = project.briefMarkdown || buildFallbackBrief(project);
 }
 
 function renderTemplateAnalysis(analysis) {
@@ -180,13 +216,68 @@ async function analyzeActiveProject() {
     logStatus("Manuelle Inhalte werden verwendet.");
   }
 
-  project.templateAnalysis = analyzeTemplate(templateText, project.templateUrl);
-  project.contentAnalysis = analyzeContent(contentText, project);
-  project.generatedHtml = buildLandingPage(project);
-  logStatus("Neue Landing Page wurde generiert.");
+  if (settings.useAi !== false) {
+    const aiKey = settings.apiKey?.trim();
+    if (aiKey) {
+      logStatus(`KI-Erstellung mit ${settings.model || "gpt-5-mini"} läuft.`);
+      const aiResult = await generateWithAi(project, templateText, contentText, aiKey);
+      if (aiResult.ok) {
+        project.templateAnalysis = aiResult.templateAnalysis;
+        project.contentAnalysis = aiResult.contentAnalysis;
+        project.generatedHtml = aiResult.landingPageHtml;
+        project.briefMarkdown = aiResult.briefMarkdown;
+        logStatus("KI-Landingpage und Briefing wurden erstellt.");
+      } else {
+        logStatus(`KI nicht erfolgreich: ${aiResult.error}`);
+        logStatus("Fallback-Generator wird verwendet.");
+        applyFallbackGeneration(project, templateText, contentText);
+      }
+    } else {
+      logStatus("Kein API-Key eingegeben. Fallback-Generator wird verwendet.");
+      applyFallbackGeneration(project, templateText, contentText);
+    }
+  } else {
+    applyFallbackGeneration(project, templateText, contentText);
+    logStatus("Regelbasierte Landingpage wurde generiert.");
+  }
+
   saveState();
   render();
   activateTab("preview");
+}
+
+function applyFallbackGeneration(project, templateText, contentText) {
+  project.templateAnalysis = analyzeTemplate(templateText, project.templateUrl);
+  project.contentAnalysis = analyzeContent(contentText, project);
+  project.generatedHtml = buildLandingPage(project);
+  project.briefMarkdown = buildFallbackBrief(project);
+}
+
+async function generateWithAi(project, templateText, contentText, apiKey) {
+  if (location.hostname.endsWith("github.io")) {
+    return {
+      ok: false,
+      error: "GitHub Pages hat keinen Node-Server fuer KI-Erstellung. Bitte lokal mit npm start nutzen.",
+    };
+  }
+
+  try {
+    const response = await fetch("/api/generate-ai", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        apiKey,
+        model: settings.model || "gpt-5-mini",
+        project,
+        templateText,
+        contentText,
+      }),
+    });
+    const data = await response.json();
+    return response.ok ? { ok: true, ...data } : { ok: false, error: data.error || "KI-Anfrage fehlgeschlagen." };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 async function readUrl(url) {
@@ -441,6 +532,42 @@ function ensureItems(items, fallback) {
   return unique([...(items || []), ...fallback]).slice(0, 4);
 }
 
+function buildFallbackBrief(project) {
+  const template = project.templateAnalysis || {};
+  const content = project.contentAnalysis || {};
+  return `# ${project.name || `Landing Page ${activeIndex + 1}`}
+
+## Status
+${project.generatedHtml ? "Landingpage wurde erstellt." : "Noch keine finale Analyse erstellt."}
+
+## Quellen
+- Vorlage: ${project.templateUrl || "nicht gesetzt"}
+- Inhaltsquelle: ${project.contentUrl || "nicht gesetzt"}
+- Hero-Screenshot: ${project.screenshotUrl || "nicht gesetzt"}
+
+## Positionierung
+${content.offer || "Noch nicht analysiert."}
+
+## Hero
+${content.headline || "Noch nicht analysiert."}
+
+## Zielgruppe
+${project.audience || "Noch nicht gesetzt."}
+
+## Struktur
+${(template.sections || ["Hero", "Nutzen", "Workflow", "Proof", "CTA"]).map((item) => `- ${item}`).join("\n")}
+
+## Nutzen
+${(content.benefits || []).map((item) => `- ${item}`).join("\n") || "- Noch keine Nutzenpunkte vorhanden."}
+
+## Naechste Codex-Schritte
+- HTML/CSS in eigenes Projekt aufteilen
+- Texte final schaerfen
+- echten App-Screenshot einsetzen
+- mobile Ansicht visuell pruefen
+`;
+}
+
 function unique(items) {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
 }
@@ -478,6 +605,18 @@ function activateTab(id) {
 }
 
 elements.nameInput.addEventListener("input", (event) => setProjectValue("name", event.target.value));
+elements.apiKeyInput.addEventListener("input", (event) => {
+  settings.apiKey = event.target.value;
+  saveSettings();
+});
+elements.useAiInput.addEventListener("change", (event) => {
+  settings.useAi = event.target.checked;
+  saveSettings();
+});
+elements.modelSelect.addEventListener("change", (event) => {
+  settings.model = event.target.value;
+  saveSettings();
+});
 elements.templateUrlInput.addEventListener("input", (event) => setProjectValue("templateUrl", event.target.value));
 elements.contentUrlInput.addEventListener("input", (event) => setProjectValue("contentUrl", event.target.value));
 elements.screenshotUrlInput.addEventListener("input", (event) => setProjectValue("screenshotUrl", event.target.value));
@@ -490,6 +629,11 @@ elements.copyButton.addEventListener("click", async () => {
   elements.copyButton.textContent = "Kopiert";
   setTimeout(() => (elements.copyButton.textContent = "Kopieren"), 1200);
 });
+elements.copyBriefButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(elements.briefOutput.value);
+  elements.copyBriefButton.textContent = "Kopiert";
+  setTimeout(() => (elements.copyBriefButton.textContent = "Briefing kopieren"), 1200);
+});
 elements.downloadButton.addEventListener("click", () => {
   const name = (activeProject().name || "landing-page").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const blob = new Blob([elements.htmlOutput.value], { type: "text/html" });
@@ -500,6 +644,40 @@ elements.downloadButton.addEventListener("click", () => {
   link.click();
   URL.revokeObjectURL(url);
 });
+elements.downloadBriefButton.addEventListener("click", () => {
+  downloadText(`${slugify(activeProject().name || "landing-page")}-briefing.md`, elements.briefOutput.value, "text/markdown");
+});
+elements.exportProjectButton.addEventListener("click", () => {
+  const project = activeProject();
+  const slug = slugify(project.name || "landing-page");
+  const bundle = `# Codex Projektpaket: ${project.name || "Landing Page"}
+
+## Datei: brief.md
+
+${elements.briefOutput.value}
+
+## Datei: index.html
+
+\`\`\`html
+${elements.htmlOutput.value}
+\`\`\`
+`;
+  downloadText(`${slug}-codex-projektpaket.md`, bundle, "text/markdown");
+});
+
+function slugify(value) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "landing-page";
+}
+
+function downloadText(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 document.querySelectorAll(".tab").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.tab));

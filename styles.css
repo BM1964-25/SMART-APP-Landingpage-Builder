@@ -371,6 +371,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -386,6 +387,11 @@ textarea {
     background 0.16s ease;
 }
 
+select {
+  min-height: 46px;
+  appearance: none;
+}
+
 textarea {
   resize: vertical;
   min-height: 230px;
@@ -398,10 +404,30 @@ textarea::placeholder {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   outline: 0;
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(14, 124, 114, 0.15);
+}
+
+.toggle-row span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 14px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  box-shadow: none;
 }
 
 .split {
@@ -527,6 +553,16 @@ textarea:focus {
   background: #101719;
   color: #dce7e6;
   border-color: #253236;
+}
+
+#briefOutput {
+  width: 100%;
+  height: calc(100vh - 276px);
+  min-height: 460px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  background: #fff;
 }
 
 @media (max-width: 1080px) {
