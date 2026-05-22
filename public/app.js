@@ -291,7 +291,7 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
 }
 
 async function testAiConnection() {
-  const apiKey = settings.apiKey?.trim();
+  const apiKey = normalizeApiKey(settings.apiKey);
   elements.aiConnectionStatus.className = "";
   if (!apiKey) {
     elements.aiConnectionStatus.textContent = "Kein API-Key eingegeben";
@@ -320,6 +320,10 @@ async function testAiConnection() {
     elements.aiConnectionStatus.classList.add("error");
     logStatus(`Anthropic-Verbindung fehlgeschlagen: ${error.message}`);
   }
+}
+
+function normalizeApiKey(value = "") {
+  return String(value).trim().replace(/^Bearer\s*/i, "").trim();
 }
 
 async function readUrl(url) {

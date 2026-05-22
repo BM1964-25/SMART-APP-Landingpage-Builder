@@ -46,6 +46,10 @@ function compactText(value = "", limit = 80_000) {
     .slice(0, limit);
 }
 
+function normalizeApiKey(value = "") {
+  return String(value).trim().replace(/^Bearer\s*/i, "").trim();
+}
+
 async function readUrl(req, res) {
   try {
     const { url } = await readJsonBody(req, 20_000);
@@ -78,7 +82,7 @@ async function readUrl(req, res) {
 async function generateAiLandingPage(req, res) {
   try {
     const body = await readJsonBody(req);
-    const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY;
+    const apiKey = normalizeApiKey(body.apiKey || process.env.ANTHROPIC_API_KEY);
     const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
     if (!apiKey) {
       sendJson(res, 400, { error: "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen." });
@@ -121,11 +125,13 @@ Qualitaetsstandard 10/10:
 - HTML/CSS muss eigenstaendig, sauber strukturiert und direkt im Browser nutzbar sein.
 
 Arbeitsweise:
-1. Analysiere erst die Vorlage: Layoutmuster, Tonalitaet, Sektionen, CTA-System, visuelle Hierarchie.
-2. Analysiere dann die Inhaltsquelle: Angebot, Zielgruppe, Schmerzpunkte, Nutzen, Features, Proof, CTA.
-3. Verdichte daraus ein scharfes Landingpage-Konzept.
-4. Schreibe die Seite neu, nicht nur umsortiert.
-5. Fuehre vor der Ausgabe intern eine Selbstpruefung durch: Wenn das Ergebnis generisch klingt, verbessere es.
+1. Extrahiere alle Vorgaben selbst aus der Vorlage und Inhaltsquelle. Manuelle Inhalte sind nur Ergaenzung.
+2. Analysiere die Vorlage: Layoutmuster, Hero-Aufbau, Header, Sektionen, CTA-System, visuelle Hierarchie, Farben, Typografie, Button-Stil, Card-Stil, Abstaende, Tonalitaet.
+3. Analysiere die Inhaltsquelle: Angebot, Zielgruppe, Schmerzpunkte, Nutzen, Features, Workflow, Proof, CTA, Fachbegriffe, konkrete App-Funktionen.
+4. Trenne strikt: "aus Quelle erkannt" vs. "Annahme". Erfinde keine Fakten.
+5. Verdichte daraus ein scharfes Landingpage-Konzept.
+6. Schreibe die Seite neu, nicht nur umsortiert.
+7. Fuehre vor der Ausgabe intern eine Selbstpruefung durch: Wenn das Ergebnis generisch klingt, verbessere es.
 
 Gib ausschliesslich valides JSON zurueck. Keine Markdown-Codefences, keine Erklaerung ausserhalb des JSON.`,
         messages: [
@@ -137,6 +143,11 @@ Projekt:
 ${JSON.stringify(source, null, 2)}
 
 Nicht verhandelbare Anforderungen:
+- Hole die Vorgaben primaer selbst aus templateText und contentText.
+- Nutze templateText fuer Design, Struktur, Stil, CTA-Logik und Seitenmuster.
+- Nutze contentText fuer App-Inhalte, Nutzen, Zielgruppe, Features, Workflow und Proof.
+- Nutze manuelle Inhalte nur als Ergaenzung oder Ersatz, falls eine Quelle wenig hergibt.
+- Markiere fehlende Informationen und Annahmen explizit im briefMarkdown.
 - landingPageHtml muss eine vollstaendige, eigenstaendige HTML-Datei mit inline CSS sein.
 - Die Landingpage muss deutsch sein.
 - Die Texte muessen deutlich besser, spezifischer und verkaufsstaerker sein als eine reine Zusammenfassung.
@@ -176,6 +187,8 @@ Copy-Regeln:
 - Keine erfundenen Kunden, Zahlen, Zertifikate oder Testimonials.
 
 Briefing-Anforderungen:
+- Quellenextraktion: Welche Designvorgaben wurden aus der Vorlage erkannt?
+- Quellenextraktion: Welche Inhaltsvorgaben wurden aus der Inhaltsquelle erkannt?
 - Positionierung
 - Zielgruppe
 - Hauptversprechen
@@ -240,7 +253,7 @@ JSON-Format exakt:
 async function testAnthropicConnection(req, res) {
   try {
     const body = await readJsonBody(req, 30_000);
-    const apiKey = body.apiKey || process.env.ANTHROPIC_API_KEY;
+    const apiKey = normalizeApiKey(body.apiKey || process.env.ANTHROPIC_API_KEY);
     const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
     if (!apiKey) {
       sendJson(res, 400, { error: "Bitte Anthropic API-Key eingeben oder ANTHROPIC_API_KEY setzen." });
