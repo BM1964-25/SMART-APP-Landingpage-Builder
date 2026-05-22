@@ -9,6 +9,8 @@ const staleStatusPatterns = [
   /nicht an Anthropic gesendet werden/i,
   /Der eingefügte API-Key enthält weiterhin ungültige Zeichen/i,
   /Der API-Key enthält ein nicht erlaubtes Sonderzeichen/i,
+  /Technischer Verbindungsfehler beim Senden an Anthropic/i,
+  /Key wurde bereinigt/i,
 ];
 
 const defaultProjects = Array.from({ length: projectCount }, (_, index) => ({
@@ -453,9 +455,6 @@ function showAiError(message) {
 function humanizeConnectionError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
     return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
-  }
-  if (/expected pattern|string did not match|header value|bytestring|invalid character/i.test(message)) {
-    return "Technischer Verbindungsfehler beim Senden an Anthropic. Key wurde bereinigt; bitte Verbindung erneut prüfen.";
   }
   return message || "Verbindung fehlgeschlagen";
 }

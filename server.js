@@ -80,9 +80,6 @@ function humanizeServerError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid/i.test(message)) {
     return "Interne Anthropic-Modellkennung war ungültig. Die App wurde auf eine gültige Sonnet-ID umgestellt.";
   }
-  if (/expected pattern|string did not match|header value|bytestring|invalid character/i.test(message)) {
-    return "Technischer Verbindungsfehler beim Senden an Anthropic. Key wurde bereinigt; bitte Verbindung erneut prüfen.";
-  }
   return message || "Anthropic Anfrage fehlgeschlagen.";
 }
 
