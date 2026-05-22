@@ -532,10 +532,10 @@ function renderApiDiagnostics(diagnostics = null) {
 
 function humanizeConnectionError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
-    return "Anthropic-Modellkennung war ungültig. Die App nutzt jetzt claude-sonnet-4-20250514 als Standard.";
+    return "Anthropic-Modellkennung war ungültig. Die App nutzt jetzt claude-3-5-sonnet-20241022 als Standard.";
   }
   if (/the string did not match the expected pattern|string did not match|expected pattern/i.test(message)) {
-    return "Anthropic konnte den Request nicht annehmen. Geprüft: POST /v1/messages ohne Slash, Modell claude-sonnet-4-20250514.";
+    return "Anthropic konnte den Request nicht annehmen. Geprüft: POST /v1/messages ohne Slash, Modell claude-3-5-sonnet-20241022.";
   }
   return message || "Verbindung fehlgeschlagen";
 }

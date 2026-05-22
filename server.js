@@ -6,7 +6,15 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("./public", import.meta.url));
 const port = Number(process.env.PORT || 8171);
 const anthropicEndpoint = "https://api.anthropic.com/v1/messages";
-const defaultAnthropicModel = "claude-sonnet-4-20250514";
+const defaultAnthropicModel = "claude-3-5-sonnet-20241022";
+const allowedAnthropicModels = new Set([
+  "claude-3-5-sonnet-20241022",
+  "claude-3-5-sonnet-latest",
+  "claude-3-7-sonnet-20250219",
+  "claude-3-7-sonnet-latest",
+  "claude-sonnet-4-20250514",
+  "claude-sonnet-4-0",
+]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -80,7 +88,7 @@ function validateAnthropicKey(apiKey) {
 
 function getAnthropicModel() {
   const candidate = String(process.env.ANTHROPIC_MODEL || "").trim();
-  if (/^claude-[A-Za-z0-9._-]+$/.test(candidate)) return candidate;
+  if (allowedAnthropicModels.has(candidate)) return candidate;
   return defaultAnthropicModel;
 }
 
