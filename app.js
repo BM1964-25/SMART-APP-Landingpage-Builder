@@ -296,6 +296,13 @@ function applyFallbackGeneration(project, templateText, contentText) {
 }
 
 async function generateWithAi(project, templateText, contentText, apiKey) {
+  if (isMaskedApiKey(apiKey)) {
+    clearBrokenApiKey();
+    return {
+      ok: false,
+      error: "Der gespeicherte API-Key war nur die maskierte Anzeige und wurde entfernt. Bitte den Original-Key einmal neu einfügen.",
+    };
+  }
   if (location.hostname.endsWith("github.io")) {
     return {
       ok: false,
@@ -329,6 +336,10 @@ async function verifyAnthropicConnection({ markConnected = false } = {}) {
   const apiKey = getActiveApiKey();
   elements.aiConnectionStatus.className = "";
   if (!apiKey) return showAiError("Kein API-Key eingegeben");
+  if (isMaskedApiKey(apiKey)) {
+    clearBrokenApiKey();
+    return showAiError("Der gespeicherte API-Key war nur die maskierte Anzeige und wurde entfernt. Bitte den Original-Key einmal neu einfügen.");
+  }
   apiKeyUi.loading = true;
   renderApiKeyManager();
   elements.aiConnectionStatus.textContent = "Teste Verbindung...";
@@ -365,6 +376,10 @@ function getActiveApiKey() {
 function saveApiKey() {
   const candidate = normalizeApiKey(apiKeyUi.draft || (apiKeyUi.visible ? elements.apiKeyInput.value : settings.apiKey));
   if (!candidate) return showAiError("Kein API-Key eingegeben");
+  if (isMaskedApiKey(candidate)) {
+    clearBrokenApiKey();
+    return showAiError("Das ist nur die maskierte Anzeige, nicht der echte API-Key. Bitte den Original-Key einmal neu einfügen.");
+  }
   settings.apiKey = candidate;
   apiKeyUi.draft = "";
   apiKeyUi.visible = false;
@@ -398,8 +413,8 @@ function humanizeConnectionError(message = "") {
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
     return "Anthropic-Modellkennung war ungültig. Bitte lokalen Server neu starten und erneut testen.";
   }
-  if (/expected pattern|string did not match/i.test(message)) {
-    return "Verbindung zu Anthropic konnte nicht hergestellt werden. Bitte Key erneut speichern und Verbindung testen.";
+  if (/expected pattern|string did not match|header value|bytestring|invalid character/i.test(message)) {
+    return "Der gespeicherte API-Key ist beschädigt oder enthält Zeichen, die nicht an Anthropic gesendet werden können. Bitte den Original-Key einmal neu einfügen.";
   }
   return message || "Verbindung fehlgeschlagen";
 }
@@ -425,6 +440,19 @@ function maskApiKey(apiKey = "") {
   const clean = normalizeApiKey(apiKey);
   if (!clean) return "";
   return `${clean.slice(0, 7)}${"•".repeat(10)}`;
+}
+
+function isMaskedApiKey(apiKey = "") {
+  return String(apiKey).includes("•");
+}
+
+function clearBrokenApiKey() {
+  settings.apiKey = "";
+  apiKeyUi.draft = "";
+  apiKeyUi.visible = false;
+  apiKeyUi.connected = false;
+  saveSettings();
+  renderApiKeyManager();
 }
 
 async function readUrl(url) {
