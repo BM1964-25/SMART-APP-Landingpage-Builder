@@ -1,7 +1,8 @@
 const STORAGE_KEY = "landingpage-app-builder-v1";
 const SETTINGS_KEY = "landingpage-app-builder-settings-v1";
 const projectCount = 10;
-const localServerUrl = "http://127.0.0.1:8171/";
+const localServerUrl = "http://127.0.0.1:8173/";
+const localApiBase = `${localServerUrl}api`;
 const staleStatusPatterns = [
   /Verbindung zu Anthropic konnte nicht hergestellt werden/i,
   /Bitte Key erneut speichern und Verbindung testen/i,
@@ -50,7 +51,15 @@ let apiKeyUi = {
 };
 
 function isStaticGitHubPages() {
-  return location.hostname.endsWith("github.io");
+  return location.protocol === "file:" || location.hostname.endsWith("github.io");
+}
+
+function isLocalNodeApp() {
+  return ["127.0.0.1", "localhost"].includes(location.hostname);
+}
+
+function apiUrl(path) {
+  return isLocalNodeApp() ? path : `${localApiBase}${path.replace(/^\/api/, "")}`;
 }
 
 const elements = {
@@ -261,8 +270,6 @@ function renderApiKeyManager() {
   elements.connectAiButton.classList.toggle("connected", apiKeyUi.connected);
   elements.connectAiButton.classList.toggle("loading", apiKeyUi.loading);
   elements.testAiButton.classList.toggle("loading", apiKeyUi.loading);
-  elements.connectAiButton.disabled = isStaticGitHubPages();
-  elements.testAiButton.disabled = isStaticGitHubPages();
   renderApiDiagnostics();
 }
 
@@ -393,15 +400,8 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
       error: "Der gespeicherte API-Key war nur die maskierte Anzeige und wurde entfernt. Bitte den Original-Key einmal neu einfügen.",
     };
   }
-  if (location.hostname.endsWith("github.io")) {
-    return {
-      ok: false,
-      error: "GitHub Pages hat keinen Node-Server fuer KI-Erstellung. Bitte lokal mit npm start nutzen.",
-    };
-  }
-
   try {
-    const response = await fetch("/api/generate-ai", {
+    const response = await fetch(apiUrl("/api/generate-ai"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -415,7 +415,7 @@ async function generateWithAi(project, templateText, contentText, apiKey) {
     if (data.diagnostics) renderApiDiagnostics(data.diagnostics);
     return response.ok ? { ok: true, ...data } : { ok: false, error: humanizeConnectionError(data.error || "KI-Anfrage fehlgeschlagen."), diagnostics: data.diagnostics };
   } catch (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: humanizeConnectionError(error.message) };
   }
 }
 
@@ -424,17 +424,6 @@ async function testAiConnection() {
 }
 
 async function verifyAnthropicConnection({ markConnected = false } = {}) {
-  if (isStaticGitHubPages()) {
-    const message = `GitHub Pages ist nur die statische Oberfläche. Anthropic funktioniert nur lokal mit laufendem Node-Server: ${localServerUrl}`;
-    showAiError(message);
-    renderApiDiagnostics({
-      endpoint: "/api/test-anthropic",
-      method: "POST",
-      error: "Kein Node-Server auf GitHub Pages",
-    });
-    logStatus("GitHub Pages hat keinen Node-Server. Lokal testen.");
-    return;
-  }
   const apiKey = getActiveApiKey();
   elements.aiConnectionStatus.className = "";
   if (!apiKey) return showAiError("Kein API-Key eingegeben");
@@ -446,7 +435,7 @@ async function verifyAnthropicConnection({ markConnected = false } = {}) {
   renderApiKeyManager();
   elements.aiConnectionStatus.textContent = "Teste Verbindung...";
   try {
-    const response = await fetch("/api/test-anthropic", {
+    const response = await fetch(apiUrl("/api/test-anthropic"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ apiKey }),
@@ -561,8 +550,8 @@ function renderApiDiagnostics(diagnostics = null) {
 }
 
 function humanizeConnectionError(message = "") {
-  if (/failed to fetch|unexpected token|not found|404/i.test(message) && isStaticGitHubPages()) {
-    return `GitHub Pages hat keinen Node-Server. Bitte lokal öffnen: ${localServerUrl}`;
+  if (/failed to fetch|networkerror|load failed|unexpected token|not found|404/i.test(message) && isStaticGitHubPages()) {
+    return `Lokaler Node-Server nicht erreichbar. Bitte SMART APP & Landingpage Builder.app starten oder lokal npm start nutzen (${localServerUrl}).`;
   }
   if (/model/i.test(message) && /pattern|not found|invalid|ungültig/i.test(message)) {
     return "Anthropic-Modellkennung war ungültig. Die App nutzt jetzt claude-3-5-sonnet-20241022 als Standard.";
@@ -606,15 +595,8 @@ function clearBrokenApiKey() {
 }
 
 async function readUrl(url) {
-  if (location.hostname.endsWith("github.io")) {
-    return {
-      ok: false,
-      error: "GitHub Pages kann keine fremden URLs serverseitig auslesen. Nutze die lokale Node-App fuer die Analyse.",
-    };
-  }
-
   try {
-    const response = await fetch("/api/read-url", {
+    const response = await fetch(apiUrl("/api/read-url"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ url }),
@@ -622,7 +604,7 @@ async function readUrl(url) {
     const data = await response.json();
     return { ok: response.ok && data.ok !== false, ...data };
   } catch (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: humanizeConnectionError(error.message) };
   }
 }
 
@@ -912,7 +894,7 @@ ${error || "Unbekannter Fehler"}
 ## Was pruefen?
 - Ist der Anthropic API-Key korrekt?
 - Ist im Anthropic-Konto API-Billing/Credits aktiv?
-- Laeuft die App lokal ueber http://127.0.0.1:8171/ und nicht nur auf GitHub Pages?
+- Laeuft der lokale Proxy ueber http://127.0.0.1:8173/?
 - Klicke im Setup auf "Anthropic-Verbindung testen".
 
 ## Fuer 10/10 Ergebnisse benoetigt die KI moeglichst gute Eingangsdaten

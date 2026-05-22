@@ -1,10 +1,14 @@
 import { createServer } from "node:http";
+import { mkdirSync, appendFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("./public", import.meta.url));
-const port = Number(process.env.PORT || 8171);
+const projectRoot = fileURLToPath(new URL("./", import.meta.url));
+const logsDir = join(projectRoot, "logs");
+const logFile = join(logsDir, "landingpage-builder-server.log");
+const port = Number(process.env.PORT || 8173);
 const anthropicEndpoint = "https://api.anthropic.com/v1/messages";
 const anthropicModelsEndpoint = "https://api.anthropic.com/v1/models";
 const defaultAnthropicModel = "claude-3-5-sonnet-20241022";
@@ -25,8 +29,21 @@ const mimeTypes = {
   ".svg": "image/svg+xml",
 };
 
+mkdirSync(logsDir, { recursive: true });
+
+function logLine(message = "") {
+  const line = `[${new Date().toISOString()}] ${message}`;
+  console.log(message);
+  appendFileSync(logFile, `${line}\n`);
+}
+
 function sendJson(res, status, payload) {
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "content-type",
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -198,35 +215,35 @@ function buildApiDiagnostics({ rawKey = "", apiKey = "", model = getConfiguredAn
 }
 
 function logApiDiagnostics(diagnostics) {
-  console.log("--- ANTHROPIC API DIAGNOSE ---");
-  console.log("Endpoint:", diagnostics.endpoint);
-  console.log("Method:", diagnostics.method);
-  console.log("Trailing Slash:", diagnostics.hasTrailingSlash);
-  console.log("Content-Type:", diagnostics.contentType);
-  console.log("Body-Typ:", diagnostics.bodyType);
-  console.log("Body JSON valide:", diagnostics.bodyIsJson);
-  console.log("Modell:", diagnostics.model);
-  console.log("Modell-Quelle:", diagnostics.modelSource);
-  console.log("Models API Status:", diagnostics.modelsStatus);
-  console.log("Models API Server:", diagnostics.modelsResponseServer || "-");
-  console.log("Models API Content-Type:", diagnostics.modelsResponseContentType || "-");
-  console.log("Verfuegbare Modelle:", diagnostics.availableModels.join(", ") || "-");
-  console.log("Key-Quelle:", diagnostics.keySource);
-  console.log("Key vorhanden:", diagnostics.keyPresent);
-  console.log("Key-Prefix:", diagnostics.keyPrefix);
-  console.log("Key beginnt sk-ant-api03-:", diagnostics.keyStartsSkAntApi03);
-  console.log("Key beginnt sk-ant-:", diagnostics.keyStartsSkAnt);
-  console.log("Key-Laenge:", diagnostics.keyLength);
-  console.log("Key durch Normalisierung veraendert:", diagnostics.keyChangedByNormalizer);
-  console.log("Key enthaelt Whitespace:", diagnostics.keyHasWhitespace);
-  console.log("Key enthaelt Maske:", diagnostics.keyHasMask);
-  if (diagnostics.responseStatus) console.log("Anthropic Status:", diagnostics.responseStatus);
-  if (diagnostics.responseStatusText) console.log("Anthropic Status Text:", diagnostics.responseStatusText);
-  if (diagnostics.responseServer) console.log("Anthropic Response Server:", diagnostics.responseServer);
-  if (diagnostics.responseContentType) console.log("Anthropic Response Content-Type:", diagnostics.responseContentType);
-  if (diagnostics.responseRequestId) console.log("Anthropic Request ID:", diagnostics.responseRequestId);
-  if (diagnostics.apiError) console.log("Anthropic API Fehler:", diagnostics.apiError);
-  if (diagnostics.error) console.log("Fehler:", diagnostics.error);
+  logLine("--- ANTHROPIC API DIAGNOSE ---");
+  logLine(`Endpoint: ${diagnostics.endpoint}`);
+  logLine(`Method: ${diagnostics.method}`);
+  logLine(`Trailing Slash: ${diagnostics.hasTrailingSlash}`);
+  logLine(`Content-Type: ${diagnostics.contentType}`);
+  logLine(`Body-Typ: ${diagnostics.bodyType}`);
+  logLine(`Body JSON valide: ${diagnostics.bodyIsJson}`);
+  logLine(`Modell: ${diagnostics.model}`);
+  logLine(`Modell-Quelle: ${diagnostics.modelSource}`);
+  logLine(`Models API Status: ${diagnostics.modelsStatus || "-"}`);
+  logLine(`Models API Server: ${diagnostics.modelsResponseServer || "-"}`);
+  logLine(`Models API Content-Type: ${diagnostics.modelsResponseContentType || "-"}`);
+  logLine(`Verfuegbare Modelle: ${diagnostics.availableModels.join(", ") || "-"}`);
+  logLine(`Key-Quelle: ${diagnostics.keySource}`);
+  logLine(`Key vorhanden: ${diagnostics.keyPresent}`);
+  logLine(`Key-Prefix: ${diagnostics.keyPrefix}`);
+  logLine(`Key beginnt sk-ant-api03-: ${diagnostics.keyStartsSkAntApi03}`);
+  logLine(`Key beginnt sk-ant-: ${diagnostics.keyStartsSkAnt}`);
+  logLine(`Key-Laenge: ${diagnostics.keyLength}`);
+  logLine(`Key durch Normalisierung veraendert: ${diagnostics.keyChangedByNormalizer}`);
+  logLine(`Key enthaelt Whitespace: ${diagnostics.keyHasWhitespace}`);
+  logLine(`Key enthaelt Maske: ${diagnostics.keyHasMask}`);
+  if (diagnostics.responseStatus) logLine(`Anthropic Status: ${diagnostics.responseStatus}`);
+  if (diagnostics.responseStatusText) logLine(`Anthropic Status Text: ${diagnostics.responseStatusText}`);
+  if (diagnostics.responseServer) logLine(`Anthropic Response Server: ${diagnostics.responseServer}`);
+  if (diagnostics.responseContentType) logLine(`Anthropic Response Content-Type: ${diagnostics.responseContentType}`);
+  if (diagnostics.responseRequestId) logLine(`Anthropic Request ID: ${diagnostics.responseRequestId}`);
+  if (diagnostics.apiError) logLine(`Anthropic API Fehler: ${diagnostics.apiError}`);
+  if (diagnostics.error) logLine(`Fehler: ${diagnostics.error}`);
 }
 
 function humanizeServerError(message = "") {
@@ -541,6 +558,16 @@ async function serveStatic(req, res) {
 }
 
 createServer((req, res) => {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,POST,OPTIONS",
+      "access-control-allow-headers": "content-type",
+      "access-control-max-age": "86400",
+    });
+    res.end();
+    return;
+  }
   if (req.method === "POST" && req.url === "/api/read-url") {
     readUrl(req, res);
     return;
@@ -554,6 +581,6 @@ createServer((req, res) => {
     return;
   }
   serveStatic(req, res);
-}).listen(port, () => {
-  console.log(`SMART APP & Landingpage Builder läuft auf http://127.0.0.1:${port}`);
+}).listen(port, "127.0.0.1", () => {
+  logLine(`SMART APP & Landingpage Builder läuft auf http://127.0.0.1:${port}`);
 });
