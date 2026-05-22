@@ -58,13 +58,21 @@ function loadState() {
     if (Array.isArray(saved) && saved.length === projectCount) {
       return saved.map((project, index) => ({
         ...defaultProjects[index],
-        ...project,
+        ...migrateProject(project, index),
       }));
     }
   } catch {
     // Ignore malformed local data.
   }
   return defaultProjects;
+}
+
+function migrateProject(project, index) {
+  const migrated = { ...project };
+  if (index === 0 && (!migrated.name || migrated.name === "SMART Landingpage Builder" || migrated.name === "SMART APP&Landingpage Builder")) {
+    migrated.name = "SMART APP & Landingpage Builder";
+  }
+  return migrated;
 }
 
 function loadSettings() {
